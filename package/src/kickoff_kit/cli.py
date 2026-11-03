@@ -13,7 +13,19 @@ from .tickets.adapters import AdapterError, make_adapter
 
 TICKET_CHOICES = [("redmine", "Redmine", True), ("jira", "Jira", False), ("gitlab", "GitLab Issues", False), ("github", "GitHub Issues", False)]
 REPO_CHOICES = [("gitlab", "GitLab", True), ("github", "GitHub", False)]
+GITLAB_TOKEN_HINT = ("     Create a personal access token on https://{host}/-/user_settings/personal_access_tokens with scopes\n"
+                     "     'api' and 'write_repository' (fine-grained tokens: include User: Read), then run\n"
+                     "     `glab auth login --hostname {host}` and `kickoff-kit doctor`.")
 DEFAULT_MARKETPLACE = "https://github.com/<owner>/kickoff-kit-marketplace.git"  # set at release time
+
+
+def normalize_host(value: str) -> str:
+    """'https://gitlab.example.com/' → 'gitlab.example.com' (glab needs a bare host name)."""
+    v = value.strip()
+    for prefix in ("https://", "http://"):
+        if v.lower().startswith(prefix):
+            v = v[len(prefix):]
+    return v.split("/")[0]
 
 
 def ask(prompt: str, default: str = "") -> str:
@@ -89,11 +101,15 @@ def cmd_setup(_args) -> int:
         cfg.tickets = setup_tickets_redmine(cfg.tickets)
 
     rp = choose("Repository and CI/CD", REPO_CHOICES)
-    cfg.repo = RepoConfig(provider=rp, host=ask("GitLab host", cfg.repo.host or "gitlab.com"))
+    cfg.repo = RepoConfig(provider=rp, host=normalize_host(ask("GitLab host name (e.g. gitlab.com or gitlab.example.com)", normalize_host(cfg.repo.host) or "gitlab.com")))
     if not st.which("glab"):
         bad("glab (GitLab CLI) not found — install: macOS `brew install glab`, Windows `winget install GLab.GLab`; then run setup again.")
         return 1
-    (ok if st.gitlab_login(cfg.repo.host) else bad)(f"GitLab login ({cfg.repo.host})")
+    if st.gitlab_login(cfg.repo.host):
+        ok(f"GitLab login ({cfg.repo.host})")
+    else:
+        bad(f"GitLab login ({cfg.repo.host})")
+        print(GITLAB_TOKEN_HINT.format(host=cfg.repo.host))
 
     cfg.marketplace = ask("\nkickoff-kit plugin marketplace (git URL)", cfg.marketplace or DEFAULT_MARKETPLACE)
     cfg.save()
@@ -143,7 +159,7 @@ def cmd_doctor(_args) -> int:
         failed += 1
     checks = [
         ("Claude Code MCP: kickoff-tickets", ["claude", "mcp", "list"], st.MCP_NAME),
-        (f"GitLab login ({cfg.repo.host})", ["glab", "auth", "status", "--hostname", cfg.repo.host], None),
+        (f"GitLab login ({normalize_host(cfg.repo.host)})", ["glab", "auth", "status", "--hostname", normalize_host(cfg.repo.host)], None),
         ("Superpowers plugin", ["claude", "plugin", "list"], "superpowers"),
         ("kickoff-kit plugin", ["claude", "plugin", "list"], "kickoff-kit"),
     ]
@@ -171,22 +187,28 @@ def check_integrity() -> int:
         print("  ➖ Plugin integrity: skipped (development build)")
         return 0
     dirs = integrity.find_installed(st.CLAUDE_HOME)
-    if not dirs:
-        bad("Plugin integrity: kickoff-kit plugin not found under ~/.claude/plugins")
+    current = [d for d in dirs if integrity.installed_version(d) == man["version"]]
+    stale = [d for d in dirs if d not in current]
+    for d in stale:
+        print(f"  ➖ Old cached version v{integrity.installed_version(d)} ignored ({d}) — safe to delete")
+    if not current:
+        bad(f"Plugin integrity: kickoff-kit v{man['version']} not installed"
+            + (f" (found only v{', v'.join(sorted({str(integrity.installed_version(d)) for d in stale}))})" if stale else ""))
+        print("       Update the plugin: /plugin update (or /plugin uninstall kickoff-kit@kickoff-kit, then /plugin install kickoff-kit@kickoff-kit)")
         return 1
     failures = 0
-    for d in dirs:
+    for d in current:
         r = integrity.verify(d, man)
         changed = r["modified"] + r["missing"] + r["extra"]
         if not changed:
             ok(f"Plugin integrity: v{man['version']} unchanged ({d})")
-        else:
-            failures += 1
-            bad(f"Plugin integrity: {len(changed)} file(s) differ from release v{man['version']} ({d})")
-            for k, label in (("modified", "modified"), ("missing", "missing"), ("extra", "not in release")):
-                for f in r[k]:
-                    print(f"       {label}: {f}")
-            print("       Reinstall the plugin: /plugin uninstall kickoff-kit@kickoff-kit, then /plugin install kickoff-kit@kickoff-kit")
+            continue
+        failures += 1
+        bad(f"Plugin integrity: {len(changed)} file(s) differ from release v{man['version']} ({d})")
+        for k, label in (("modified", "modified"), ("missing", "missing"), ("extra", "not in release")):
+            for f in r[k]:
+                print(f"       {label}: {f}")
+        print("       Reinstall the plugin: /plugin uninstall kickoff-kit@kickoff-kit, then /plugin install kickoff-kit@kickoff-kit")
     return failures
 
 

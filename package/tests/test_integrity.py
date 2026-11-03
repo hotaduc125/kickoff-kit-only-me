@@ -60,3 +60,25 @@ def test_can_read_repo_no_prompt(monkeypatch):
         return 128, "fatal"
     assert st.can_read_repo("https://example/x.git", runner=runner) is False
     assert seen["prompt"] == "0"
+
+
+def test_old_cached_version_is_ignored(tmp_path, monkeypatch, capsys):
+    new = make_plugin(tmp_path)
+    man = integrity.compute_manifest(new, "1.1.0")
+    old = tmp_path / "plugins" / "cache" / "kickoff-kit" / "1.0.0"
+    (old / ".claude-plugin").mkdir(parents=True)
+    (old / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "kickoff-kit", "version": "1.0.0"}))
+    monkeypatch.setattr(st, "CLAUDE_HOME", tmp_path)
+    monkeypatch.setattr(integrity, "shipped_manifest", lambda: man)
+    assert cli.check_integrity() == 0
+    out = capsys.readouterr().out
+    assert "Old cached version v1.0.0 ignored" in out and "unchanged" in out
+
+
+def test_only_old_version_installed_fails(tmp_path, monkeypatch, capsys):
+    d = make_plugin(tmp_path)
+    man = integrity.compute_manifest(d, "1.2.0")
+    monkeypatch.setattr(st, "CLAUDE_HOME", tmp_path)
+    monkeypatch.setattr(integrity, "shipped_manifest", lambda: man)
+    assert cli.check_integrity() == 1
+    assert "v1.2.0 not installed" in capsys.readouterr().out

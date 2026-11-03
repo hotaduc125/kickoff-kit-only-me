@@ -9,7 +9,8 @@ from pathlib import Path
 
 CLAUDE_HOME = Path.home() / ".claude"
 POCOCK_REPO = "https://github.com/mattpocock/skills.git"
-POCOCK_SKILLS = ("handoff", "zoom-out")
+POCOCK_REF = "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"           # pinned commit of mattpocock/skills (update deliberately in a release)
+POCOCK_SKILLS = ("handoff",)      # zoom-out is a kickoff-kit team skill (removed upstream)
 SUPERPOWERS_MARKETPLACE = "obra/superpowers-marketplace"
 SUPERPOWERS_PLUGIN = "superpowers@superpowers-marketplace"
 KICKOFF_PLUGIN = "kickoff-kit@kickoff-kit"
@@ -78,15 +79,19 @@ def find_skill_dirs(root: Path, names=POCOCK_SKILLS) -> dict[str, Path]:
     return found
 
 
-def install_pocock_skills(cache: Path, runner=run, skills_dir: Path = CLAUDE_HOME / "skills") -> tuple[list[str], list[str]]:
+def install_pocock_skills(cache: Path, runner=run, skills_dir: Path = CLAUDE_HOME / "skills",
+                          ref: str = POCOCK_REF) -> tuple[list[str], list[str]]:
+    """Fetch Matt Pocock's skills at a pinned commit and copy the selected ones into ~/.claude/skills."""
     repo = cache / "mattpocock-skills"
-    if (repo / ".git").exists():
-        runner(["git", "-C", str(repo), "pull", "--ff-only"])
-    else:
-        cache.mkdir(parents=True, exist_ok=True)
-        code, out = runner(["git", "clone", "--depth", "1", POCOCK_REPO, str(repo)])
-        if code != 0:
-            return [], list(POCOCK_SKILLS)
+    if not (repo / ".git").exists():
+        repo.mkdir(parents=True, exist_ok=True)
+        runner(["git", "-C", str(repo), "init", "-q"])
+        runner(["git", "-C", str(repo), "remote", "add", "origin", POCOCK_REPO])
+    code, _ = runner(["git", "-C", str(repo), "fetch", "-q", "--depth", "1", "origin", ref])
+    if code == 0:
+        code, _ = runner(["git", "-C", str(repo), "checkout", "-q", "--force", "FETCH_HEAD"])
+    if code != 0:
+        return [], list(POCOCK_SKILLS)
     found = find_skill_dirs(repo)
     skills_dir.mkdir(parents=True, exist_ok=True)
     done = []

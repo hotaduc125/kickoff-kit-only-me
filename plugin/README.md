@@ -4,7 +4,7 @@ Claude Code plugin marketplace for the Enclave team workflow.
 
 | Plugin | Contents |
 |---|---|
-| `kickoff-kit` | Skills: `tickets`, `choose-mode`, `qa-agent`, `ticket-writer` · Commands: `/kickoff-kit:next-ticket`, `/kickoff-kit:doctor` |
+| `kickoff-kit` | Skills: `tickets`, `choose-mode`, `qa-agent`, `ticket-writer`, `zoom-out` · Commands: `/kickoff-kit:next-ticket`, `/kickoff-kit:doctor` |
 
 Installed automatically by `kickoff-kit setup`. Manual install in Claude Code:
 

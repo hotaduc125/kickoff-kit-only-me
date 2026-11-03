@@ -1,6 +1,6 @@
 [project]
 name = "kickoff-kit"
-version = "1.1.0"
+version = "1.1.3"
 description = "One-command setup of the team's AI coding workflow: ticket system, repository/CI, Claude Code, Superpowers and team skills."
 readme = "README.md"
 requires-python = ">=3.10"

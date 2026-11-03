@@ -56,3 +56,10 @@ def find_installed(claude_home: Path) -> list[Path]:
         except (OSError, ValueError):
             continue
     return out
+
+
+def installed_version(plugin_dir: Path) -> str | None:
+    try:
+        return json.loads((plugin_dir / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")).get("version")
+    except (OSError, ValueError):
+        return None

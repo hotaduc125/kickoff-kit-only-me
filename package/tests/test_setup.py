@@ -29,18 +29,23 @@ def test_merge_permissions_keeps_existing(tmp_path):
     assert (tmp_path / "settings.json.kickoff-backup").exists()
 
 
-def test_find_and_install_pocock_skills(tmp_path):
+def test_find_and_install_pocock_skills_pinned(tmp_path):
     repo = tmp_path / "cache" / "mattpocock-skills"
-    for name in ("handoff", "zoom-out", "tdd"):
-        (repo / "skills" / name).mkdir(parents=True)
-        (repo / "skills" / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
-    (repo / ".git").mkdir()
+    for group, name in (("productivity", "handoff"), ("engineering", "tdd")):
+        (repo / "skills" / group / name).mkdir(parents=True)
+        (repo / "skills" / group / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
     calls = []
     done, miss = st.install_pocock_skills(tmp_path / "cache", runner=lambda c, interactive=False: (calls.append(c) or (0, "")),
-                                          skills_dir=tmp_path / "skills")
-    assert sorted(done) == ["handoff", "zoom-out"] and miss == []
+                                          skills_dir=tmp_path / "skills", ref="abc123")
+    assert done == ["handoff"] and miss == []
     assert (tmp_path / "skills" / "handoff" / "SKILL.md").exists() and not (tmp_path / "skills" / "tdd").exists()
-    assert calls[0][:3] == ["git", "-C", str(repo)]
+    assert ["git", "-C", str(repo), "fetch", "-q", "--depth", "1", "origin", "abc123"] in calls
+
+
+def test_pocock_fetch_failure_reports_missing(tmp_path):
+    done, miss = st.install_pocock_skills(tmp_path / "cache", runner=lambda c, interactive=False: (1, "fatal"),
+                                          skills_dir=tmp_path / "skills", ref="abc123")
+    assert done == [] and miss == ["handoff"]
 
 
 def test_register_mcp_command_order(monkeypatch):
@@ -61,3 +66,8 @@ def test_choose_refuses_unavailable(monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", lambda *_: next(answers))
     assert cli.choose("Ticket system", cli.TICKET_CHOICES) == "redmine"
     assert "not available" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("raw", ["https://gitlab.enclave.vn/", "gitlab.enclave.vn", "http://gitlab.enclave.vn/group", " gitlab.enclave.vn "])
+def test_normalize_host(raw):
+    assert cli.normalize_host(raw) == "gitlab.enclave.vn"

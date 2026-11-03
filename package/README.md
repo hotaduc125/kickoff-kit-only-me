@@ -5,8 +5,8 @@ One command sets up the team's AI coding workflow on a developer's machine:
 - **ticket system** (v1: Redmine; planned: Jira, GitLab Issues, GitHub Issues) through the `kickoff-tickets` MCP server —
   nine tools, the same for every system, with the team rules enforced in code;
 - **repository and CI/CD** (v1: GitLab via `glab`; planned: GitHub via `gh`);
-- **Claude Code** with **Superpowers**, **Matt Pocock's** `handoff` and `zoom-out` skills and the **kickoff-kit plugin**
-  (team skills `tickets`, `choose-mode`, `qa-agent`, `ticket-writer`, commands `/kickoff-kit:next-ticket`, `/kickoff-kit:doctor`);
+- **Claude Code** with **Superpowers**, **Matt Pocock's** `handoff` skill (pinned commit) and the **kickoff-kit plugin**
+  (team skills `tickets`, `choose-mode`, `qa-agent`, `ticket-writer`, `zoom-out`, commands `/kickoff-kit:next-ticket`, `/kickoff-kit:doctor`);
 - a final **doctor** check (whoami on the ticket system, MCP registration, GitLab login, plugins, skills).
 
 Tokens are asked once, verified, and stored in the **OS keyring** (macOS Keychain, Windows Credential Manager). They are
