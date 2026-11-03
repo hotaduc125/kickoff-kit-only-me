@@ -147,3 +147,43 @@ def gitlab_login(host: str, runner=run) -> bool:
         return True
     code, _ = runner(["glab", "auth", "login", "--hostname", host], interactive=True)
     return code == 0
+
+
+# ---------- updates from GitHub Releases of the marketplace repository
+def github_repo_from_url(url: str) -> str | None:
+    """'https://github.com/owner/repo.git' or 'git@github.com:owner/repo.git' → 'owner/repo'."""
+    import re
+    m = re.match(r"^(?:https://github\.com/|git@github\.com:)([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", (url or "").strip())
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def parse_version(v: str) -> tuple:
+    return tuple(int(x) for x in v.lstrip("v").split(".") if x.isdigit())
+
+
+def latest_release(repo: str, runner=run) -> str | None:
+    code, out = runner(["gh", "release", "view", "--repo", repo, "--json", "tagName", "--jq", ".tagName"])
+    return out.strip() if code == 0 and out.strip() else None
+
+
+def download_wheel(repo: str, tag: str, dest: Path, runner=run) -> Path | None:
+    dest.mkdir(parents=True, exist_ok=True)
+    for old in dest.glob("kickoff_kit-*.whl"):
+        old.unlink()
+    code, _ = runner(["gh", "release", "download", tag, "--repo", repo, "--pattern", "kickoff_kit-*.whl", "--dir", str(dest), "--clobber"])
+    wheels = sorted(dest.glob("kickoff_kit-*.whl"))
+    return wheels[-1] if code == 0 and wheels else None
+
+
+def uv_command() -> str | None:
+    found = which("uv")
+    if found:
+        return found
+    home_uv = Path.home() / ".local" / "bin" / ("uv.exe" if sys.platform == "win32" else "uv")
+    return str(home_uv) if home_uv.exists() else None
+
+
+def update_plugin(runner=run) -> bool:
+    runner(["claude", "plugin", "marketplace", "update", "kickoff-kit"])
+    code, out = runner(["claude", "plugin", "update", HTKM_PLUGIN])
+    return code == 0 or "up to date" in out.lower() or "already" in out.lower()

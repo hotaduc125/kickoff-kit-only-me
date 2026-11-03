@@ -8,7 +8,8 @@ Produces dist-release/:
 
 Usage:
   python scripts/release.py --marketplace-url https://github.com/<owner>/kickoff-kit-marketplace.git
-  python scripts/release.py ... --publish-to ../kickoff-kit-marketplace   # also commit + tag in a local clone of the release repo
+  python scripts/release.py ... --publish-to ../kickoff-kit-marketplace          # commit + tag in a local clone of the release repo
+  python scripts/release.py ... --publish-to ../kickoff-kit-marketplace --push   # also push and create the GitHub Release with the wheel
 Team members never need this repository.
 """
 from __future__ import annotations
@@ -41,6 +42,7 @@ def main() -> int:
     a = argparse.ArgumentParser()
     a.add_argument("--marketplace-url", required=True, help="git URL of the RELEASE marketplace repository")
     a.add_argument("--publish-to", help="local clone of the release repository: files are synced, committed and tagged")
+    a.add_argument("--push", action="store_true", help="push the release repo and create a GitHub Release with the wheel (needs gh)")
     a.add_argument("--skip-tests", action="store_true")
     args = a.parse_args()
 
@@ -97,7 +99,20 @@ def main() -> int:
         sh(["git", "add", "-A"], cwd=dst)
         sh(["git", "commit", "-m", f"Release kickoff-kit {v}"], cwd=dst)
         sh(["git", "tag", f"v{v}"], cwd=dst)
-        print(f"\nRelease repository updated. Push with:  git -C {dst} push && git -C {dst} push --tags")
+        if not args.push:
+            print(f"\nRelease repository updated. Push with:  git -C {dst} push && git -C {dst} push --tags")
+        else:
+            sh(["git", "push"], cwd=dst)
+            sh(["git", "push", "--tags"], cwd=dst)
+            from kickoff_kit.setup_steps import github_repo_from_url  # noqa: E402
+            repo = github_repo_from_url(args.marketplace_url)
+            wheel = next(OUT.glob("kickoff_kit-*.whl"))
+            if repo and shutil.which("gh"):
+                sh(["gh", "release", "create", f"v{v}", str(wheel), "--repo", repo, "--title", f"kickoff-kit {v}",
+                    "--notes", f"kickoff-kit {v}. Team members: run `kickoff-kit update`."])
+                print(f"\nGitHub Release v{v} created on {repo}. Tell the team: `kickoff-kit update`.")
+            else:
+                print("\ngh not found or marketplace not on GitHub — upload the wheel to a release manually.")
 
     print(f"\nDone: {OUT}")
     return 0

@@ -30,7 +30,8 @@ Manual alternative: `uv tool install <wheel or package>` then `kickoff-kit setup
 | Command | |
 |---|---|
 | `kickoff-kit setup` | Choose tools, enter tokens, configure everything (safe to run again) |
-| `kickoff-kit doctor` | Check that everything works |
+| `kickoff-kit doctor` | Check that everything works (also tells you when an update is available) |
+| `kickoff-kit update` | Install the latest release and update the plugin (`--check` only reports) |
 | `kickoff-kit uninstall` | Remove the configuration, token and MCP registration (keeps Superpowers) |
 
 ## The nine ticket tools

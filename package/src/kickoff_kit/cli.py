@@ -173,6 +173,14 @@ def cmd_doctor(_args) -> int:
         (ok if good else bad)("Access to the kickoff-kit marketplace")
         failed += 0 if good else 1
     failed += check_integrity()
+    repo = st.github_repo_from_url(cfg.marketplace)
+    if repo and st.which("gh"):
+        from . import __version__ as current
+        tag = st.latest_release(repo)
+        if tag and st.parse_version(tag) > st.parse_version(current):
+            print(f"  ➖ Update available: {tag} (installed v{current}) — run `kickoff-kit update`")
+    elif repo:
+        print("  ➖ GitHub CLI (gh) not installed — needed for `kickoff-kit update`")
     for s in st.POCOCK_SKILLS:
         present = (st.CLAUDE_HOME / "skills" / s / "SKILL.md").exists()
         (ok if present else bad)(f"skill {s}")
@@ -212,6 +220,51 @@ def check_integrity() -> int:
     return failures
 
 
+def cmd_update(args) -> int:
+    from . import __version__ as current
+    try:
+        cfg = Config.load()
+    except SystemExit as e:
+        bad(str(e)); return 1
+    repo = st.github_repo_from_url(cfg.marketplace)
+    if not repo:
+        bad(f"Updates need the marketplace on GitHub; current marketplace: {cfg.marketplace}")
+        return 1
+    if not st.which("gh"):
+        bad("GitHub CLI (gh) not found — install it (macOS `brew install gh`, Windows `winget install GitHub.cli`), run `gh auth login`, then try again.")
+        return 1
+    tag = st.latest_release(repo)
+    if not tag:
+        bad(f"Cannot read the releases of {repo} — check your access and `gh auth status`.")
+        return 1
+    print(f"Installed: v{current} · latest release: {tag}")
+    if st.parse_version(tag) <= st.parse_version(current) and not args.force:
+        ok("Already up to date")
+        return 0
+    if args.check:
+        print(f"  ➖ Update available: {tag} — run `kickoff-kit update`")
+        return 0
+    wheel = st.download_wheel(repo, tag, HOME / "downloads")
+    if not wheel:
+        bad(f"Could not download the wheel of {tag}")
+        return 1
+    ok(f"Downloaded {wheel.name}")
+    uv = st.uv_command()
+    if not uv:
+        bad("uv not found — install uv and run again."); return 1
+    code, out = st.run([uv, "tool", "install", "--force", str(wheel)])
+    if code != 0:
+        bad(f"Install failed: {out.strip()[:300]}"); return 1
+    ok(f"kickoff-kit {tag} installed")
+    if st.update_plugin():
+        ok("kickoff-kit plugin updated")
+    else:
+        bad("Plugin update: run /plugin update in Claude Code (or reinstall kickoff-kit@kickoff-kit)")
+    print("\nChecking with the new version:\n")
+    new_cli = st.which("kickoff-kit") or "kickoff-kit"
+    return st.run([new_cli, "doctor"], interactive=True)[0]
+
+
 def cmd_uninstall(_args) -> int:
     try:
         cfg = Config.load()
@@ -236,6 +289,10 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("setup", help="choose tools, enter tokens, configure Claude Code").set_defaults(fn=cmd_setup)
     sub.add_parser("doctor", help="check that everything works").set_defaults(fn=cmd_doctor)
+    up = sub.add_parser("update", help="install the latest release and update the plugin")
+    up.add_argument("--check", action="store_true", help="only report whether an update is available")
+    up.add_argument("--force", action="store_true", help="reinstall even if already up to date")
+    up.set_defaults(fn=cmd_update)
     sub.add_parser("uninstall", help="remove kickoff-kit configuration").set_defaults(fn=cmd_uninstall)
     a = p.parse_args(argv)
     try:
