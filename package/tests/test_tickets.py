@@ -3,11 +3,11 @@ import asyncio
 import httpx
 import pytest
 
-from kickoff_kit.config import TicketConfig
-from kickoff_kit.tickets.adapters.redmine import RedmineAdapter
-from kickoff_kit.tickets.audit import Audit
-from kickoff_kit.tickets.core import TicketTools, ToolError
-from kickoff_kit.tickets.server import build
+from avflow.config import TicketConfig
+from avflow.tickets.adapters.redmine import RedmineAdapter
+from avflow.tickets.audit import Audit
+from avflow.tickets.core import TicketTools, ToolError
+from avflow.tickets.server import build
 from fake_redmine import FakeRedmine, issue
 
 

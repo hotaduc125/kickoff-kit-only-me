@@ -1,11 +1,11 @@
 {
-  "name": "kickoff-kit",
+  "name": "avflow",
   "owner": { "name": "Enclave" },
   "description": "Enclave team workflow for AI coding agents",
   "plugins": [
     {
-      "name": "kickoff-kit",
-      "source": "./plugins/kickoff-kit",
+      "name": "avflow",
+      "source": "./plugins/avflow",
       "description": "Team skills and commands: ticket workflow, choose-mode, qa-agent, ticket writing."
     }
   ]

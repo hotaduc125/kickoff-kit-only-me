@@ -1,0 +1,4 @@
+# Sensitive paths need a code-owner review (GitLab: enable "Require approval from code owners").
+# TODO: replace the examples with the project's sensitive paths and owners.
+# /src/Machine/        @owner-username
+# /build/              @owner-username

@@ -1,13 +1,13 @@
 import json
 
-from kickoff_kit import cli, integrity
-from kickoff_kit import setup_steps as st
+from avflow import cli, integrity
+from avflow import setup_steps as st
 
 
 def make_plugin(root):
-    d = root / "plugins" / "x" / "kickoff-kit"
+    d = root / "plugins" / "x" / "avflow"
     (d / ".claude-plugin").mkdir(parents=True)
-    (d / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "kickoff-kit", "version": "1.1.0"}))
+    (d / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "avflow", "version": "1.1.0"}))
     (d / "skills" / "tickets").mkdir(parents=True)
     (d / "skills" / "tickets" / "SKILL.md").write_text("line1\nline2\n")
     return d
@@ -65,9 +65,9 @@ def test_can_read_repo_no_prompt(monkeypatch):
 def test_old_cached_version_is_ignored(tmp_path, monkeypatch, capsys):
     new = make_plugin(tmp_path)
     man = integrity.compute_manifest(new, "1.1.0")
-    old = tmp_path / "plugins" / "cache" / "kickoff-kit" / "1.0.0"
+    old = tmp_path / "plugins" / "cache" / "avflow" / "1.0.0"
     (old / ".claude-plugin").mkdir(parents=True)
-    (old / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "kickoff-kit", "version": "1.0.0"}))
+    (old / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "avflow", "version": "1.0.0"}))
     monkeypatch.setattr(st, "CLAUDE_HOME", tmp_path)
     monkeypatch.setattr(integrity, "shipped_manifest", lambda: man)
     assert cli.check_integrity() == 0
@@ -82,3 +82,30 @@ def test_only_old_version_installed_fails(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(integrity, "shipped_manifest", lambda: man)
     assert cli.check_integrity() == 1
     assert "v1.2.0 not installed" in capsys.readouterr().out
+
+
+def test_claude_code_markers_are_ignored(tmp_path):
+    d = make_plugin(tmp_path)
+    man = integrity.compute_manifest(d, "1.1.0")
+    (d / ".in_use").mkdir(); (d / ".in_use" / "82435").write_text("")
+    (d / ".orphaned_at").write_text("2026-11-04")
+    assert integrity.verify(d, man) == {"modified": [], "missing": [], "extra": []}
+
+
+def test_plugin_newer_than_command_points_to_command_update(tmp_path, monkeypatch, capsys):
+    d = make_plugin(tmp_path)                       # plugin v1.1.0 installed
+    man = integrity.compute_manifest(d, "1.0.9")    # command ships v1.0.9
+    monkeypatch.setattr(st, "CLAUDE_HOME", tmp_path)
+    monkeypatch.setattr(integrity, "shipped_manifest", lambda: man)
+    assert cli.check_integrity() == 1
+    out = capsys.readouterr().out
+    assert "plugin is v1.1.0 but this avflow command is v1.0.9" in out and "avflow update" in out
+
+
+def test_orphaned_same_version_folder_is_not_current(tmp_path, monkeypatch, capsys):
+    d = make_plugin(tmp_path)
+    man = integrity.compute_manifest(d, "1.1.0")
+    (d / ".orphaned_at").write_text("x")
+    monkeypatch.setattr(st, "CLAUDE_HOME", tmp_path)
+    monkeypatch.setattr(integrity, "shipped_manifest", lambda: man)
+    assert cli.check_integrity() == 1   # only an orphaned copy → plugin v1.1.0 not really installed

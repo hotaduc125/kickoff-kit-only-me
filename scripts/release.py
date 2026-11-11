@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Build an kickoff-kit release from this development repository.
+"""Build an avflow release from this development repository.
 
 Produces dist-release/:
   marketplace/          → push to the RELEASE repository (what team members install as the plugin marketplace)
-  kickoff_kit-<v>-py3-none-any.whl   → the package (setup + MCP server), with the plugin checksums embedded
+  avflow-<v>-py3-none-any.whl   → the package (setup + MCP server), with the plugin checksums embedded
   bootstrap.sh · bootstrap.ps1 · INSTALL.md
 
 Usage:
-  python scripts/release.py --marketplace-url https://github.com/<owner>/kickoff-kit-marketplace.git
-  python scripts/release.py ... --publish-to ../kickoff-kit-marketplace          # commit + tag in a local clone of the release repo
-  python scripts/release.py ... --publish-to ../kickoff-kit-marketplace --push   # also push and create the GitHub Release with the wheel
+  python scripts/release.py --marketplace-url https://github.com/<owner>/avflow-marketplace.git
+  python scripts/release.py ... --publish-to ../avflow-marketplace          # commit + tag in a local clone of the release repo
+  python scripts/release.py ... --publish-to ../avflow-marketplace --push   # also push and create the GitHub Release with the wheel
 Team members never need this repository.
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ def sh(cmd, cwd=None):
 
 def versions() -> tuple[str, str]:
     pv = re.search(r'^version\s*=\s*"([^"]+)"', (PKG / "pyproject.toml").read_text(), re.M).group(1)
-    lv = json.loads((PLUGIN / "plugins/kickoff-kit/.claude-plugin/plugin.json").read_text())["version"]
+    lv = json.loads((PLUGIN / "plugins/avflow/.claude-plugin/plugin.json").read_text())["version"]
     return pv, lv
 
 
@@ -46,11 +46,22 @@ def main() -> int:
     a.add_argument("--skip-tests", action="store_true")
     args = a.parse_args()
 
+    if args.push:
+        from_repo = re.match(r"^(?:https://github\.com/|git@github\.com:)([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", args.marketplace_url.strip())
+        if not args.publish_to:
+            print("--push needs --publish-to"); return 1
+        if not from_repo:
+            print("--push creates a GitHub Release, so --marketplace-url must be a GitHub repository"); return 1
+        if not shutil.which("gh"):
+            print("GitHub CLI (gh) not found — install it (brew install gh), then: gh auth login"); return 1
+        if subprocess.run(["gh", "auth", "status"], capture_output=True).returncode != 0:
+            print("gh is not signed in — run: gh auth login   (then: gh auth setup-git)"); return 1
+
     pv, lv = versions()
     if pv != lv:
         print(f"Version mismatch: package {pv} ≠ plugin {lv}. Bump both."); return 1
     v = pv
-    print(f"Releasing kickoff-kit {v}")
+    print(f"Releasing avflow {v}")
 
     if not args.skip_tests:
         runner = ["uv", "run", "pytest", "-q"] if shutil.which("uv") else [sys.executable, "-m", "pytest", "-q"]
@@ -63,14 +74,14 @@ def main() -> int:
 
     # Embed checksums of the released plugin in the package (doctor compares installed files with them).
     sys.path.insert(0, str(PKG / "src"))
-    from kickoff_kit.integrity import compute_manifest  # noqa: E402
-    manifest = compute_manifest(market / "plugins/kickoff-kit", v)
-    data = PKG / "src/kickoff_kit/data/plugin_manifest.json"
+    from avflow.integrity import compute_manifest  # noqa: E402
+    manifest = compute_manifest(market / "plugins/avflow", v)
+    data = PKG / "src/avflow/data/plugin_manifest.json"
     original_manifest = data.read_text()
     data.write_text(json.dumps(manifest, indent=2) + "\n")
 
     # Default marketplace URL for setup.
-    cli = PKG / "src/kickoff_kit/cli.py"
+    cli = PKG / "src/avflow/cli.py"
     original_cli = cli.read_text()
     cli.write_text(re.sub(r'DEFAULT_MARKETPLACE = "[^"]*"', f'DEFAULT_MARKETPLACE = "{args.marketplace_url}"', original_cli))
     try:
@@ -97,22 +108,31 @@ def main() -> int:
         for p in market.iterdir():
             (shutil.copytree if p.is_dir() else shutil.copy2)(p, dst / p.name)
         sh(["git", "add", "-A"], cwd=dst)
-        sh(["git", "commit", "-m", f"Release kickoff-kit {v}"], cwd=dst)
-        sh(["git", "tag", f"v{v}"], cwd=dst)
+        if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=dst).returncode != 0:
+            sh(["git", "commit", "-m", f"Release avflow {v}"], cwd=dst)
+        else:
+            print("Release repository already up to date — no new commit.")
+        if subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/tags/v{v}"], cwd=dst, capture_output=True).returncode != 0:
+            sh(["git", "tag", f"v{v}"], cwd=dst)
+        else:
+            print(f"Tag v{v} already exists — kept.")
         if not args.push:
             print(f"\nRelease repository updated. Push with:  git -C {dst} push && git -C {dst} push --tags")
         else:
             sh(["git", "push"], cwd=dst)
             sh(["git", "push", "--tags"], cwd=dst)
-            from kickoff_kit.setup_steps import github_repo_from_url  # noqa: E402
+            from avflow.setup_steps import github_repo_from_url  # noqa: E402
             repo = github_repo_from_url(args.marketplace_url)
-            wheel = next(OUT.glob("kickoff_kit-*.whl"))
-            if repo and shutil.which("gh"):
-                sh(["gh", "release", "create", f"v{v}", str(wheel), "--repo", repo, "--title", f"kickoff-kit {v}",
-                    "--notes", f"kickoff-kit {v}. Team members: run `kickoff-kit update`."])
-                print(f"\nGitHub Release v{v} created on {repo}. Tell the team: `kickoff-kit update`.")
+            wheel = next(OUT.glob("avflow-*.whl"))
+            exists = subprocess.run(["gh", "release", "view", f"v{v}", "--repo", repo], capture_output=True).returncode == 0
+            assets = [str(wheel), str(OUT / "bootstrap.sh"), str(OUT / "bootstrap.ps1"), str(OUT / "INSTALL.md")]
+            if exists:
+                sh(["gh", "release", "upload", f"v{v}", *assets, "--repo", repo, "--clobber"])
+                print(f"\nGitHub Release v{v} already existed — wheel re-uploaded.")
             else:
-                print("\ngh not found or marketplace not on GitHub — upload the wheel to a release manually.")
+                sh(["gh", "release", "create", f"v{v}", *assets, "--repo", repo, "--title", f"avflow {v}",
+                    "--notes", f"avflow {v}. Team members: run `avflow update`."])
+                print(f"\nGitHub Release v{v} created on {repo}. Tell the team: `avflow update`.")
 
     print(f"\nDone: {OUT}")
     return 0

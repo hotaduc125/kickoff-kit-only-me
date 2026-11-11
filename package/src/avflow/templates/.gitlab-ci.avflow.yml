@@ -1,0 +1,44 @@
+# avflow jobs — include from .gitlab-ci.yml with:
+#   include:
+#     - local: .gitlab-ci.avflow.yml
+# CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY (masked, protected; a dedicated CI account).
+# avflow-secret-scan is the server-side backup of the local git guardrails: it scans the commits of every
+# merge request and every push to develop. Update the pinned gitleaks version deliberately.
+
+avflow-mr-title:
+  stage: .pre
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo "$CI_MERGE_REQUEST_TITLE" | grep -Eiq 'refs #[0-9]+' || (echo "MR title must contain 'Refs #<ticket-id>'"; exit 1)
+
+avflow-secret-scan:
+  stage: .pre
+  image:
+    name: zricethezav/gitleaks:v8.18.4
+    entrypoint: [""]
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      variables:
+        AVFLOW_SCAN_RANGE: "$CI_MERGE_REQUEST_DIFF_BASE_SHA..$CI_COMMIT_SHA"
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_PIPELINE_SOURCE == "push"'
+      variables:
+        AVFLOW_SCAN_RANGE: "$CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
+  script:
+    - |
+      case "$AVFLOW_SCAN_RANGE" in
+        0000000000000000000000000000000000000000..*) AVFLOW_SCAN_RANGE="$CI_COMMIT_SHA~1..$CI_COMMIT_SHA" ;;
+      esac
+    - gitleaks detect --source . --log-opts="$AVFLOW_SCAN_RANGE" --redact --verbose --no-banner
+
+avflow-ready-for-test:
+  stage: .post
+  image: python:3.12-slim
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_PIPELINE_SOURCE == "push"'
+  script:
+    - apt-get update -qq && apt-get install -y -qq git > /dev/null
+    - python ci/avflow_redmine_update.py

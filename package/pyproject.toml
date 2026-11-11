@@ -1,6 +1,6 @@
 [project]
-name = "kickoff-kit"
-version = "1.2.0"
+name = "avflow"
+version = "2.5.0"
 description = "One-command setup of the team's AI coding workflow: ticket system, repository/CI, Claude Code, Superpowers and team skills."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,18 +12,20 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pyyaml>=6"]
 
 [project.scripts]
-kickoff-kit = "kickoff_kit.cli:main"
-kickoff-ticket-mcp = "kickoff_kit.tickets.server:main"
+avflow = "avflow.cli:main"
+avflow-ticket-mcp = "avflow.tickets.server:main"
+avflow-git-guard = "avflow.git_guard:main"
+avflow-monitor = "avflow.monitor:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/kickoff_kit"]
+packages = ["src/avflow"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
