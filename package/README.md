@@ -74,10 +74,10 @@ Manual alternative: `uv tool install <wheel or package>` then `avflow setup`.
 ## Commands
 | Command | |
 |---|---|
-| `avflow setup` | Choose tools, enter tokens, configure everything (safe to run again) |
+| `avflow setup` | Enter your tokens and configure Claude Code with the team settings (safe to run again); `--advanced` asks every setting |
 | `avflow check` | Check that everything works (also tells you when an update is available) |
 | `avflow update` | Install the latest release and update the plugin (`--check` only reports) |
-| `avflow config` | Show the configuration (never the token); `--edit` opens it, `--path` prints its location |
+| `avflow config` | Show the settings and which are personal (never the token); `--edit`, `--path`, `--reset` (back to the team settings) |
 | `avflow init` | Add the team's standard files to a project repository (CLAUDE.md, docs/CONTEXT.md, ADR, CODEOWNERS, MR template, `.gitattributes`, `.editorconfig`, GitLab CI jobs: MR title check, secret scan with gitleaks, ticket to *Ready for test* after merge); never overwrites without `--force` |
 | `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the tickets referenced by the commits |
 | `avflow usage` | Context size per session (orchestrator) and subagent calls with their models, from the context monitor |

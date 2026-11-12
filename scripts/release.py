@@ -80,6 +80,25 @@ def main() -> int:
     original_manifest = data.read_text()
     data.write_text(json.dumps(manifest, indent=2) + "\n")
 
+    # Team configuration: validate it and embed it (with the version and the marketplace URL).
+    team_src = ROOT / "team" / "avflow-team.toml"
+    if not team_src.exists():
+        print(f"Missing {team_src} — the team configuration is required for a release."); return 1
+    import tomllib
+    try:
+        team = tomllib.loads(team_src.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as e:
+        print(f"team/avflow-team.toml is not valid TOML: {e}"); return 1
+    problems = [k for k, ok in (("tickets.url", (team.get("tickets") or {}).get("url")),
+                                ("repo.host", (team.get("repo") or {}).get("host"))) if not ok]
+    if problems:
+        print("team/avflow-team.toml must set: " + ", ".join(problems)); return 1
+    team_dst = PKG / "src/avflow/data/team.toml"
+    original_team = team_dst.read_text(encoding="utf-8")
+    team_dst.write_text(f'team_version = "{v}"\nmarketplace = "{args.marketplace_url}"\n\n' +
+                        "\n".join(l for l in team_src.read_text(encoding="utf-8").splitlines()
+                                  if not l.startswith(("team_version", "marketplace"))) + "\n", encoding="utf-8")
+
     # Default marketplace URL for setup.
     cli = PKG / "src/avflow/cli.py"
     original_cli = cli.read_text()
@@ -91,6 +110,7 @@ def main() -> int:
             sh([sys.executable, "-m", "pip", "wheel", ".", "--no-deps", "-w", str(OUT)], cwd=PKG)
     finally:
         cli.write_text(original_cli)          # keep the dev repository generic
+        team_dst.write_text(original_team)
         data.write_text(original_manifest)    # dev builds skip the integrity check
 
     for f in ("bootstrap.sh", "bootstrap.ps1"):

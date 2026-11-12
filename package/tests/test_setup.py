@@ -136,6 +136,7 @@ def test_config_show_has_no_token(tmp_path, monkeypatch, capsys):
     class Args:
         edit = False
         path = False
+        reset = False
     assert cli.cmd_config(Args()) == 0
     out = capsys.readouterr().out
     assert "https://r.test" in out and "secret-token-value" not in out and "Token stored in the OS keyring for https://r.test: yes" in out

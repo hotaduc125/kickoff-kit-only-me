@@ -124,12 +124,55 @@ def apply_status_preset(t, preset: dict) -> None:
         setattr(t, k, list(v) if isinstance(v, list) else v)
 
 
-def cmd_setup(_args) -> int:
+def print_team_summary(cfg) -> None:
+    from .config import team_version
+    v = team_version() or "dev"
+    t, w, m, mo = cfg.tickets, cfg.workflow, cfg.models, cfg.monitor
+    print(f"Team settings (release {v}) — use `avflow setup --advanced` to change them for yourself")
+    print(f"  Redmine {t.url or '(not set)'} · GitLab {cfg.repo.host}")
+    print(f"  Statuses: {t.status_ready} → {t.status_in_progress} → {t.status_in_review} → {', '.join(t.blocker_done)}")
+    print(f"  Workflow: {st.PROFILES.get(w.profile, w.profile)} · git guardrails {'on' if w.git_guardrails else 'off'}")
+    print(f"  Models: plan {m.plan} · implement {m.implement} · review {m.review}")
+    print(f"  Context monitor: {'on' if mo.enabled else 'off'} (warn {mo.warn_tokens // 1000}k, limit {mo.critical_tokens // 1000}k)\n")
+
+
+def setup_redmine_token(t: TicketConfig) -> TicketConfig:
+    """Default setup: the team gives the URL and names; the member only enters their own API key."""
+    old_url = t.url
+    if not t.url:
+        t.url = ask("Redmine URL (base address, e.g. https://redmine.example.com/redmine)").rstrip("/")
+    print(f"Redmine — your own account at {t.url}. The API key is under My account → API access key.")
+    for _ in range(3):
+        token = getpass.getpass("Redmine API key (hidden): ").strip()
+        try:
+            me = make_adapter(t, token).whoami()
+        except (AdapterError, SystemExit) as e:
+            bad(str(e))
+            continue
+        ok(f"Connected as {me['name']} ({me['login']})")
+        try:
+            available = [x["name"] for x in make_adapter(t, token).statuses()]
+        except Exception:  # noqa: BLE001
+            available = []
+        missing = status_plan(available, t)["missing"] if available else []
+        if missing:
+            bad(f"The team's statuses are not all in this Redmine (missing: {', '.join(missing)}). Tell the PM; "
+                "until then, `avflow setup --advanced` can map them for you.")
+        set_secret("redmine", t.url, token)
+        ok("API key stored in the OS keyring (not in any file)")
+        if old_url and old_url.rstrip("/") != t.url:
+            delete_secret("redmine", old_url)
+        return t
+    raise SystemExit("Could not connect to Redmine after 3 attempts.")
+
+
+def cmd_setup(args) -> int:
     print(f"avflow {__version__} — setup\n")
     try:
         cfg = Config.load()
     except SystemExit:
-        cfg = Config()
+        cfg = Config.team()
+    advanced = bool(getattr(args, "advanced", False))
 
     print("Prerequisites")
     missing = [n for n in ("git", "claude") if not st.which(n)]
@@ -139,12 +182,16 @@ def cmd_setup(_args) -> int:
         print("\nInstall the missing tools first: git (https://git-scm.com), Claude Code (https://docs.claude.com/claude-code).")
         return 1
 
-    tp = choose("Ticket system", TICKET_CHOICES)
-    if tp == "redmine":
-        cfg.tickets = setup_tickets_redmine(cfg.tickets)
+    if advanced:
+        tp = choose("Ticket system", TICKET_CHOICES)
+        if tp == "redmine":
+            cfg.tickets = setup_tickets_redmine(cfg.tickets)
 
-    rp = choose("Repository and CI/CD", REPO_CHOICES)
-    cfg.repo = RepoConfig(provider=rp, host=normalize_host(ask("GitLab host name (e.g. gitlab.com or gitlab.example.com)", normalize_host(cfg.repo.host) or "gitlab.com")))
+        rp = choose("Repository and CI/CD", REPO_CHOICES)
+        cfg.repo = RepoConfig(provider=rp, host=normalize_host(ask("GitLab host name (e.g. gitlab.com or gitlab.example.com)", normalize_host(cfg.repo.host) or "gitlab.com")))
+    else:
+        print_team_summary(cfg)
+        cfg.tickets = setup_redmine_token(cfg.tickets)
     if not st.which("glab"):
         bad("glab (GitLab CLI) not found — install: macOS `brew install glab`, Windows `winget install GLab.GLab`; then run setup again.")
         return 1
@@ -154,50 +201,54 @@ def cmd_setup(_args) -> int:
         bad(f"GitLab login ({cfg.repo.host})")
         print(GITLAB_TOKEN_HINT.format(host=cfg.repo.host))
 
-    cfg.marketplace = ask("\navflow plugin marketplace (git URL)", cfg.marketplace or DEFAULT_MARKETPLACE)
+    if advanced:
+        cfg.marketplace = ask("\navflow plugin marketplace (git URL)", cfg.marketplace or DEFAULT_MARKETPLACE)
+    else:
+        cfg.marketplace = cfg.marketplace or DEFAULT_MARKETPLACE
 
-    previous = cfg.workflow.profile
-    keys = list(st.PROFILES)
-    default = str(keys.index(previous) + 1) if previous in keys else "1"
-    print("\nCoding workflow (choose one — the two are never installed together)")
-    for n, k in enumerate(keys, 1):
-        print(f"  {n}. {st.PROFILES[k]}")
-    while True:
-        v = ask("Choose", default)
-        if v.isdigit() and 1 <= int(v) <= len(keys):
-            cfg.workflow.profile = keys[int(v) - 1]
-            break
-        print("  Enter a number from the list.")
-    g = ask("Enable git guardrails (block push to protected branches, force push, reset --hard, …)? y/n",
-            "y" if cfg.workflow.git_guardrails else "n").lower()
-    cfg.workflow.git_guardrails = g != "n"
-
-    from .config import MODEL_CHOICES
-    print("\nModels for the role subagents (" + ", ".join(MODEL_CHOICES) + ") — Enter keeps the value shown")
-    for role, label in (("plan", "Plan and design"), ("implement", "Implement"), ("review", "Review")):
+    if advanced:
+        previous = cfg.workflow.profile
+        keys = list(st.PROFILES)
+        default = str(keys.index(previous) + 1) if previous in keys else "1"
+        print("\nCoding workflow (choose one — the two are never installed together)")
+        for n, k in enumerate(keys, 1):
+            print(f"  {n}. {st.PROFILES[k]}")
         while True:
-            v = ask(f"  {label}", getattr(cfg.models, role)).strip().lower()
-            if v in MODEL_CHOICES:
-                setattr(cfg.models, role, v)
+            v = ask("Choose", default)
+            if v.isdigit() and 1 <= int(v) <= len(keys):
+                cfg.workflow.profile = keys[int(v) - 1]
                 break
-            print("  Choose one of: " + ", ".join(MODEL_CHOICES))
+            print("  Enter a number from the list.")
+        g = ask("Enable git guardrails (block push to protected branches, force push, reset --hard, …)? y/n",
+                "y" if cfg.workflow.git_guardrails else "n").lower()
+        cfg.workflow.git_guardrails = g != "n"
 
-    print("\nContext monitor — warns when a session's context grows large (answers become less reliable)")
-    mon = ask("  Enable the context monitor? y/n", "y" if cfg.monitor.enabled else "n").lower()
-    cfg.monitor.enabled = mon != "n"
-    if cfg.monitor.enabled:
-        for attr, label in (("warn_tokens", "Warn at (thousand tokens)"), ("critical_tokens", "Limit at (thousand tokens)")):
+        from .config import MODEL_CHOICES
+        print("\nModels for the role subagents (" + ", ".join(MODEL_CHOICES) + ") — Enter keeps the value shown")
+        for role, label in (("plan", "Plan and design"), ("implement", "Implement"), ("review", "Review")):
             while True:
-                v = ask(f"  {label}", str(getattr(cfg.monitor, attr) // 1000))
-                if v.isdigit() and int(v) > 0:
-                    setattr(cfg.monitor, attr, int(v) * 1000)
+                v = ask(f"  {label}", getattr(cfg.models, role)).strip().lower()
+                if v in MODEL_CHOICES:
+                    setattr(cfg.models, role, v)
                     break
-                print("  Enter a whole number, for example 300.")
-        if cfg.monitor.critical_tokens <= cfg.monitor.warn_tokens:
-            cfg.monitor.critical_tokens = cfg.monitor.warn_tokens + 100_000
-            print(f"  Limit raised to {cfg.monitor.critical_tokens // 1000}k (it must be above the warning).")
-    cfg.save()
-    ok(f"Configuration saved to {CONFIG_FILE}")
+                print("  Choose one of: " + ", ".join(MODEL_CHOICES))
+
+        print("\nContext monitor — warns when a session's context grows large (answers become less reliable)")
+        mon = ask("  Enable the context monitor? y/n", "y" if cfg.monitor.enabled else "n").lower()
+        cfg.monitor.enabled = mon != "n"
+        if cfg.monitor.enabled:
+            for attr, label in (("warn_tokens", "Warn at (thousand tokens)"), ("critical_tokens", "Limit at (thousand tokens)")):
+                while True:
+                    v = ask(f"  {label}", str(getattr(cfg.monitor, attr) // 1000))
+                    if v.isdigit() and int(v) > 0:
+                        setattr(cfg.monitor, attr, int(v) * 1000)
+                        break
+                    print("  Enter a whole number, for example 300.")
+            if cfg.monitor.critical_tokens <= cfg.monitor.warn_tokens:
+                cfg.monitor.critical_tokens = cfg.monitor.warn_tokens + 100_000
+                print(f"  Limit raised to {cfg.monitor.critical_tokens // 1000}k (it must be above the warning).")
+        cfg.save()
+        ok(f"Configuration saved to {CONFIG_FILE}")
 
     print("\nClaude Code")
     r, out = st.register_mcp()
@@ -243,7 +294,7 @@ def cmd_setup(_args) -> int:
     cfg.save()
 
     print()
-    return cmd_doctor(_args)
+    return cmd_doctor(args)
 
 
 def cmd_doctor(_args) -> int:
@@ -251,7 +302,10 @@ def cmd_doctor(_args) -> int:
     failed = 0
     try:
         cfg = Config.load()
-        ok(f"Configuration {CONFIG_FILE}")
+        from .config import team_version
+        n = sum(len(v) if isinstance(v, dict) else 1 for v in cfg.overrides().values())
+        ok(f"Configuration {CONFIG_FILE} · team settings {team_version() or 'dev'}"
+           + (f" · {n} personal override(s) — see `avflow config`" if n else ""))
     except SystemExit as e:
         bad(str(e))
         return 1
@@ -402,6 +456,7 @@ def cmd_update(args) -> int:
 
 
 def cmd_config(args) -> int:
+    from .config import sources, team_version
     if not CONFIG_FILE.exists():
         bad(f"{CONFIG_FILE} not found — run `avflow setup` first.")
         return 1
@@ -410,17 +465,29 @@ def cmd_config(args) -> int:
         return 0
     if args.edit:
         return open_in_editor(CONFIG_FILE)
-    print(f"avflow configuration — {CONFIG_FILE}\n")
-    print(CONFIG_FILE.read_text(encoding="utf-8"))
     cfg = Config.load(CONFIG_FILE)
+    if args.reset:
+        cfg = Config.team()
+        cfg.save(CONFIG_FILE)
+        ok("Personal overrides removed — the team settings apply. Run `avflow setup` to apply them to Claude Code.")
+        return 0
+    src = sources(CONFIG_FILE)
+    print(f"avflow configuration — team settings from release {team_version() or 'dev'}, personal overrides in {CONFIG_FILE}\n")
+    d = cfg.to_dict()
+    print(f"marketplace = {d['marketplace']}  ({src['marketplace']})")
+    for sec in Config.SECTIONS:
+        print(f"\n[{sec}]")
+        for k, v in d[sec].items():
+            mark = "  ← personal" if src.get(f"{sec}.{k}") == "personal" else ""
+            print(f"  {k} = {v}{mark}")
     try:
         get_secret(cfg.tickets.provider, cfg.tickets.url)
         stored = "yes"
     except SystemExit:
         stored = "no — run `avflow setup`"
-    print(f"Token stored in the OS keyring for {cfg.tickets.url}: {stored}")
-    print("\nTo change the ticket system, URL or token, run `avflow setup` (the token is tied to the URL).")
-    print("Other values can be edited with `avflow config --edit`; run `avflow check` afterwards.")
+    print(f"\nToken stored in the OS keyring for {cfg.tickets.url}: {stored}")
+    print("\nPersonal values (← personal) override the team settings. `avflow config --edit` to change them,")
+    print("`avflow config --reset` to go back to the team settings; then run `avflow setup`.")
     return 0
 
 
@@ -564,7 +631,9 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="avflow", description="Set up the team's AI coding workflow.")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("setup", help="choose tools, enter tokens, configure Claude Code").set_defaults(fn=cmd_setup)
+    sp = sub.add_parser("setup", help="enter your tokens and configure Claude Code with the team settings")
+    sp.add_argument("--advanced", action="store_true", help="also ask every team setting (saved as your personal overrides)")
+    sp.set_defaults(fn=cmd_setup)
     sub.add_parser("check", aliases=["doctor"], help="check that everything works (alias: doctor)").set_defaults(fn=cmd_doctor)
     it = sub.add_parser("init", help="add the team's standard files to a project repository")
     it.add_argument("--path", default=".", help="repository folder (default: current folder)")
@@ -588,6 +657,7 @@ def main(argv=None) -> int:
     cf = sub.add_parser("config", help="show the configuration (no token); --edit to open it")
     cf.add_argument("--edit", action="store_true", help="open the configuration file in an editor")
     cf.add_argument("--path", action="store_true", help="print the path of the configuration file")
+    cf.add_argument("--reset", action="store_true", help="remove your personal overrides and use the team settings")
     cf.set_defaults(fn=cmd_config)
     up = sub.add_parser("update", help="install the latest release and update the plugin")
     up.add_argument("--check", action="store_true", help="only report whether an update is available")

@@ -1,0 +1,103 @@
+from avflow import cli
+from avflow.config import Config, merge, sources, team_defaults
+
+TEAM = {"team_version": "9.9.9", "marketplace": "https://github.com/o/m.git",
+        "tickets": {"url": "https://redmine.team/redmine", "status_ready": "New", "status_in_review": "Feedback"},
+        "repo": {"host": "gitlab.team"},
+        "workflow": {"profile": "superpowers", "git_guardrails": True},
+        "models": {"plan": "opus", "implement": "sonnet", "review": "opus"},
+        "monitor": {"warn_tokens": 300000, "critical_tokens": 400000}}
+
+
+def test_shipped_team_file_loads():
+    d = team_defaults()
+    assert d["tickets"]["provider"] == "redmine" and "models" in d
+
+
+def test_team_values_apply_without_personal_overrides(tmp_path):
+    p = tmp_path / "config.toml"
+    Config.team(TEAM).save(p, team=TEAM)
+    body = [l for l in p.read_text().splitlines() if l and not l.startswith("#")]
+    assert body == []                                    # nothing personal written
+    c = Config.load(p, team=TEAM)
+    assert (c.tickets.url, c.tickets.status_ready, c.repo.host, c.marketplace) == \
+           ("https://redmine.team/redmine", "New", "gitlab.team", "https://github.com/o/m.git")
+
+
+def test_personal_override_wins_and_only_it_is_saved(tmp_path):
+    p = tmp_path / "config.toml"
+    c = Config.team(TEAM)
+    c.models.review = "sonnet"
+    c.save(p, team=TEAM)
+    assert "[models]" in p.read_text() and 'review = "sonnet"' in p.read_text() and "[tickets]" not in p.read_text()
+    loaded = Config.load(p, team=TEAM)
+    assert loaded.models.review == "sonnet" and loaded.models.plan == "opus" and loaded.tickets.url == TEAM["tickets"]["url"]
+    s = sources(p, team=TEAM)
+    assert s["models.review"] == "personal" and s["models.plan"] == "team"
+
+
+def test_team_change_reaches_members_without_overrides(tmp_path):
+    p = tmp_path / "config.toml"
+    Config.team(TEAM).save(p, team=TEAM)
+    newer = merge(TEAM, {"monitor": {"warn_tokens": 250000}})
+    assert Config.load(p, team=newer).monitor.warn_tokens == 250000
+
+
+def test_merge_is_per_key():
+    assert merge({"a": {"x": 1, "y": 2}, "b": 1}, {"a": {"y": 3}}) == {"a": {"x": 1, "y": 3}, "b": 1}
+
+
+def test_default_setup_asks_only_for_the_token(monkeypatch, capsys):
+    from avflow.config import TicketConfig
+    asked = []
+    monkeypatch.setattr("builtins.input", lambda prompt="": asked.append(prompt) or "")
+    monkeypatch.setattr(cli.getpass, "getpass", lambda *_: "key")
+
+    class A:
+        def whoami(self):
+            return {"name": "Alvin", "login": "alvin"}
+
+        def statuses(self):
+            return [{"name": n} for n in ("New", "In progress", "Feedback", "Resolved", "Closed")]
+    monkeypatch.setattr(cli, "make_adapter", lambda t, tok: A())
+    stored = []
+    monkeypatch.setattr(cli, "set_secret", lambda p, u, tok: stored.append(u))
+    monkeypatch.setattr(cli, "delete_secret", lambda p, u: None)
+    t = cli.setup_redmine_token(TicketConfig(url="https://redmine.team/redmine", status_ready="New", status_in_review="Feedback"))
+    assert asked == [] and stored == ["https://redmine.team/redmine"] and t.url == "https://redmine.team/redmine"
+
+
+def test_default_setup_warns_when_team_statuses_missing(monkeypatch, capsys):
+    from avflow.config import TicketConfig
+    monkeypatch.setattr(cli.getpass, "getpass", lambda *_: "key")
+
+    class A:
+        def whoami(self):
+            return {"name": "A", "login": "a"}
+
+        def statuses(self):
+            return [{"name": "New"}, {"name": "Closed"}]
+    monkeypatch.setattr(cli, "make_adapter", lambda t, tok: A())
+    monkeypatch.setattr(cli, "set_secret", lambda *a: None)
+    cli.setup_redmine_token(TicketConfig(url="https://r"))
+    assert "Tell the PM" in capsys.readouterr().out
+
+
+def test_team_summary_lists_the_settings(capsys):
+    cli.print_team_summary(Config.team(TEAM))
+    out = capsys.readouterr().out
+    assert "redmine.team" in out and "gitlab.team" in out and "New" in out and "plan opus" in out
+
+
+def test_config_reset_drops_overrides(tmp_path, monkeypatch):
+    p = tmp_path / "config.toml"
+    c = Config.team()
+    c.models.review = "haiku"
+    c.save(p)
+    monkeypatch.setattr(cli, "CONFIG_FILE", p)
+
+    class Args:
+        edit = path = False
+        reset = True
+    assert cli.cmd_config(Args()) == 0
+    assert Config.load(p).models.review == Config.team().models.review

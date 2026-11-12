@@ -74,38 +74,106 @@ class Config:
     models: ModelsConfig = field(default_factory=ModelsConfig)
     monitor: MonitorConfig = field(default_factory=MonitorConfig)
 
-    # ---------- file
+    # ---------- dict form
+    SECTIONS = ("tickets", "repo", "workflow", "models", "monitor")
+
+    def to_dict(self) -> dict:
+        d = {"marketplace": self.marketplace}
+        for sec in self.SECTIONS:
+            d[sec] = dict(getattr(self, sec).__dict__)
+        return d
+
     @staticmethod
-    def load(path: Path = CONFIG_FILE) -> "Config":
+    def from_dict(data: dict) -> "Config":
+        def build(cls, sec):
+            return cls(**{k: v for k, v in (data.get(sec) or {}).items() if k in cls.__dataclass_fields__})
+        return Config(build(TicketConfig, "tickets"), build(RepoConfig, "repo"), data.get("marketplace", "") or "",
+                      build(WorkflowConfig, "workflow"), build(ModelsConfig, "models"), build(MonitorConfig, "monitor"))
+
+    # ---------- file: team defaults (shipped with the release) + personal overrides (~/.avflow/config.toml)
+    @staticmethod
+    def load(path: Path = CONFIG_FILE, team: dict | None = None) -> "Config":
         if not path.exists():
             raise SystemExit(f"{path} not found — run `avflow setup` first.")
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
-        t = TicketConfig(**{k: v for k, v in data.get("tickets", {}).items() if k in TicketConfig.__dataclass_fields__})
-        r = RepoConfig(**{k: v for k, v in data.get("repo", {}).items() if k in RepoConfig.__dataclass_fields__})
-        w = WorkflowConfig(**{k: v for k, v in data.get("workflow", {}).items() if k in WorkflowConfig.__dataclass_fields__})
-        m = ModelsConfig(**{k: v for k, v in data.get("models", {}).items() if k in ModelsConfig.__dataclass_fields__})
-        mo = MonitorConfig(**{k: v for k, v in data.get("monitor", {}).items() if k in MonitorConfig.__dataclass_fields__})
-        return Config(t, r, data.get("marketplace", ""), w, m, mo)
+        personal = tomllib.loads(path.read_text(encoding="utf-8"))
+        return Config.from_dict(merge(team_defaults() if team is None else team, personal))
 
-    def save(self, path: Path = CONFIG_FILE) -> None:
+    @staticmethod
+    def team(team: dict | None = None) -> "Config":
+        """The team's configuration alone (no personal overrides)."""
+        return Config.from_dict(team_defaults() if team is None else team)
+
+    def overrides(self, team: dict | None = None) -> dict:
+        """Only the values that differ from the team configuration."""
+        base = Config.team(team).to_dict()
+        mine = self.to_dict()
+        out = {}
+        if mine["marketplace"] != base["marketplace"]:
+            out["marketplace"] = mine["marketplace"]
+        for sec in self.SECTIONS:
+            diff = {k: v for k, v in mine[sec].items() if base[sec].get(k) != v}
+            if diff:
+                out[sec] = diff
+        return out
+
+    def save(self, path: Path = CONFIG_FILE, team: dict | None = None) -> None:
+        """Write only the personal overrides; everything else comes from the team configuration."""
         path.parent.mkdir(parents=True, exist_ok=True)
-
-        def val(v):
-            if isinstance(v, bool):
-                return "true" if v else "false"
-            if isinstance(v, int):
-                return str(v)
-            if isinstance(v, list):
-                return "[" + ", ".join(_q(x) for x in v) + "]"
-            return _q(v)
-
-        lines = ["# avflow configuration — no secrets here (tokens are in the OS keyring)", f"marketplace = {_q(self.marketplace)}", "", "[tickets]"]
-        lines += [f"{k} = {val(v)}" for k, v in self.tickets.__dict__.items()]
-        lines += ["", "[repo]"] + [f"{k} = {val(v)}" for k, v in self.repo.__dict__.items()]
-        lines += ["", "[workflow]"] + [f"{k} = {val(v)}" for k, v in self.workflow.__dict__.items()]
-        lines += ["", "[models]  # subagent models: opus, sonnet, haiku or inherit"] + [f"{k} = {val(v)}" for k, v in self.models.__dict__.items()]
-        lines += ["", "[monitor]  # context-size monitoring (tokens)"] + [f"{k} = {val(v)}" for k, v in self.monitor.__dict__.items()]
+        ov = self.overrides(team)
+        lines = ["# avflow personal configuration — only what differs from the team configuration.",
+                 "# The team configuration comes with each avflow release (`avflow config` shows both).",
+                 "# No secrets here: tokens are in the OS keyring."]
+        if "marketplace" in ov:
+            lines += [f"marketplace = {_val(ov['marketplace'])}"]
+        for sec in self.SECTIONS:
+            if sec in ov:
+                lines += ["", f"[{sec}]"] + [f"{k} = {_val(v)}" for k, v in ov[sec].items()]
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def merge(base: dict, over: dict) -> dict:
+    out = {k: (dict(v) if isinstance(v, dict) else v) for k, v in (base or {}).items()}
+    for k, v in (over or {}).items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = {**out[k], **v}
+        else:
+            out[k] = v
+    return out
+
+
+def team_defaults() -> dict:
+    """The team configuration embedded in this release (data/team.toml); empty if absent."""
+    from importlib import resources
+    try:
+        return tomllib.loads(resources.files("avflow").joinpath("data/team.toml").read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+
+def team_version() -> str:
+    return str(team_defaults().get("team_version", "") or "")
+
+
+def sources(path: Path = CONFIG_FILE, team: dict | None = None) -> dict:
+    """For each 'section.key': 'personal' when overridden in the personal file, else 'team'."""
+    personal = tomllib.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    out = {}
+    cfg = Config.team(team).to_dict()
+    for sec in Config.SECTIONS:
+        for k in cfg[sec]:
+            out[f"{sec}.{k}"] = "personal" if k in (personal.get(sec) or {}) else "team"
+    out["marketplace"] = "personal" if "marketplace" in personal else "team"
+    return out
+
+
+def _val(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, list):
+        return "[" + ", ".join(_q(x) for x in v) + "]"
+    return _q(v)
 
 
 def _q(s: str) -> str:

@@ -10,8 +10,11 @@ avflow is the team's harness around the coding agent: it connects the ticket sys
 | `docs/WINDOWS_TEST.md` | Step-by-step Windows test checklist |
 | `INSTALL.md` | Team-facing install guide (copied into each release) |
 
+## Team settings
+`team/avflow-team.toml` is the team configuration: Redmine URL, statuses and field names, GitLab host, coding workflow, guardrails, protected branches, models and context thresholds. `release.py` validates it and embeds it in the release; members only enter their tokens in setup. Change it, release, and tell the team to run `avflow update`.
+
 ## Release
-1. Bump the version in `package/pyproject.toml`, `package/src/avflow/__init__.py` and `plugin/plugins/avflow/.claude-plugin/plugin.json` (they must match). Commit and push this repository.
+1. Review `team/avflow-team.toml`. Bump the version in `package/pyproject.toml`, `package/src/avflow/__init__.py` and `plugin/plugins/avflow/.claude-plugin/plugin.json` (they must match). Commit and push this repository.
 2. `python scripts/release.py --marketplace-url <release repo URL> --publish-to <local clone of the release repo> --push`
    — runs the tests, builds the wheel, syncs the plugin, commits, tags, pushes, and creates the GitHub Release with the wheel (needs `gh`).
 3. Tell the team: `avflow update`.

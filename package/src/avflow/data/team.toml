@@ -1,0 +1,38 @@
+# avflow team configuration — the PM edits team/avflow-team.toml in the development repository;
+# release.py embeds it here. Members never need to answer these questions in setup.
+team_version = "dev"
+marketplace = ""
+
+[tickets]
+provider = "redmine"
+url = ""
+status_ready = "Ready"
+status_in_progress = "In progress"
+status_in_review = "In review"
+field_mode = "Mode"
+field_machine_side = "Machine-side"
+field_hotspot = "Hotspot"
+tracker_bug = "Bug"
+blocker_done = ["Ready for test", "Resolved", "Closed"]
+mr_url_prefix = ""
+project = ""
+
+[repo]
+provider = "gitlab"
+host = "gitlab.com"
+
+[workflow]
+profile = "superpowers"
+git_guardrails = true
+protected_branches = ["main", "master", "develop", "release/*"]
+
+[models]
+plan = "opus"
+implement = "sonnet"
+review = "opus"
+
+[monitor]
+enabled = true
+warn_tokens = 300000
+critical_tokens = 400000
+enforce = false
