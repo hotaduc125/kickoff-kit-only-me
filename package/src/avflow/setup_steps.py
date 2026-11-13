@@ -24,7 +24,8 @@ SUPERPOWERS_PLUGIN = "superpowers@superpowers-marketplace"
 AVFLOW_PLUGIN = "avflow@avflow"
 MCP_NAME = "avflow-tickets"
 READ_TOOLS = ["whoami", "list_my_ready_tickets", "get_ticket", "find_hotspot_conflicts"]
-WRITE_TOOLS = ["add_private_note", "set_fields", "start_ticket", "submit_for_review", "create_bug_draft"]
+WRITE_TOOLS = ["add_private_note", "set_fields", "start_ticket", "assess_plan", "review_requirements", "submit_for_review",
+               "create_bug_draft"]
 
 
 def run(cmd: list[str], interactive: bool = False) -> tuple[int, str]:

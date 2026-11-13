@@ -32,8 +32,8 @@ def build(commits: list[dict], tickets: dict[int, dict], done_statuses: list[str
     lines = [f"## Changes ({frm}..{to})", ""]
     for typ in sorted(by_type):
         lines.append(f"### {typ}")
-        for t in sorted(by_type[typ], key=lambda x: (not x.get("machine_side"), x["id"])):
-            mark = " **[machine-side]**" if t.get("machine_side") else ""
+        for t in sorted(by_type[typ], key=lambda x: (not x.get("risk_areas"), x["id"])):
+            mark = "".join(f" **[{a}]**" for a in t.get("risk_areas") or [])
             lines.append(f"- #{t['id']} {t['subject']}{mark}")
         lines.append("")
     warn = []
@@ -47,13 +47,13 @@ def build(commits: list[dict], tickets: dict[int, dict], done_statuses: list[str
             warn.append(f"- #{t['id']} is '{t.get('status')}', not yet Ready for test")
     if warn:
         lines += ["## Warnings — resolve before releasing", "", *warn, ""]
-    machine = [t for t in tickets.values() if t.get("machine_side")]
+    areas = sorted({a for t in tickets.values() for a in t.get("risk_areas") or []})
     lines += ["## Acceptance checklist (customer engineer) — to complete from each ticket's acceptance criteria", ""]
-    for t in sorted(tickets.values(), key=lambda x: (not x.get("machine_side"), x["id"])):
+    for t in sorted(tickets.values(), key=lambda x: (not x.get("risk_areas"), x["id"])):
         lines.append(f"- [ ] #{t['id']} {t['subject']}")
-    lines += ["", "## Pre-release checks", "", "- [ ] CI green on the release commit", "- [ ] Regression / simulator tests green"]
-    if machine:
-        lines.append("- [ ] Machine-side changes tested on the test bench by someone other than the author")
+    lines += ["", "## Pre-release checks", "", "- [ ] CI green on the release commit", "- [ ] Regression tests green (and the project's own test environments)"]
+    if areas:
+        lines.append(f"- [ ] High-risk changes ({', '.join(areas)}): every required check done on their merge requests")
     lines += ["- [ ] Translations reviewed (if the UI changed)", "", "## Rollback", "", "- …", ""]
     return "\n".join(lines)
 
@@ -64,7 +64,7 @@ def collect(adapter, commits: list[dict]) -> dict[int, dict]:
         try:
             t = adapter.get(tid)
             tickets[tid] = {"id": tid, "subject": t["subject"], "type": t.get("type"), "status": t.get("status"),
-                            "machine_side": bool((t.get("fields") or {}).get("machine_side"))}
+                            "risk_areas": list((t.get("fields") or {}).get("risk_areas") or [])}
         except Exception as e:  # noqa: BLE001 — report any lookup problem as a warning
             tickets[tid] = {"id": tid, "subject": "(not readable)", "type": "Other", "error": str(e)}
     return tickets

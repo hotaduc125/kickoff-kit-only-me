@@ -1,11 +1,11 @@
 # avflow 3.0 — Design: one flow, project-defined risk
 
-Status: **proposed** (decisions at the end are still open) · Nov 12, 2026 · Alvin
+Status: **accepted** — decisions answered Nov 13, 2026 (Enclave's GitLab: Free); phases 1–3 built on branch `avflow-3.0-phase1`, version 3.0.0 · Nov 12, 2026 · Alvin
 Source: Claude Docs design doc (exported). This file is now the reference for implementation.
 
 ## Summary
 
-avflow 3.0 replaces the four working modes with **one ticket flow**, and replaces the Mateo-specific *Machine-side* rule with **risk areas that each project defines**. The amount of process follows the risk the change actually carries — known from the ticket and from the files it touches — instead of a mode guessed before any code exists.
+avflow 3.0 replaces the four working modes with **one ticket flow**, and replaces the project-specific *Machine-side* rule with **risk areas that each project defines**. The amount of process follows the risk the change actually carries — known from the ticket and from the files it touches — instead of a mode guessed before any code exists.
 
 **Goals**
 
@@ -59,14 +59,14 @@ Created by `avflow init` with commented examples; lives in the project repositor
 
 ```toml
 [project]
-name = "Mateo_v2"
+name = "Line_controller"
 
 [[risk.area]]
 name   = "Machine control"
-paths  = ["source/Zmotion/**", "source/MachineModes/**", "source/NullingModes/**"]
+paths  = ["source/Motion/**", "source/Modes/**"]
 owners = ["@q"]
 checks = ["plan-confirmation", "independent-review", "code-owner",
-          "checklist:Tested on the test bench by someone other than the author"]
+          "checklist:Tested on test hardware by someone other than the author"]
 
 [[risk.area]]                # one of the common areas written by avflow init
 name   = "Build and CI"
@@ -134,7 +134,7 @@ The domain decides **which** concerns are risky; the stack decides **where** man
 
 - A preset **writes a copy** into `.avflow/project.toml`; the project owns it from then on. A newer avflow never changes a project's profile silently: `avflow risk check` reports when a preset gained paths, and the project adds them by merge request.
 - Suggested stack areas are written **commented out**, with a one-line reason, so the project decides; preset paths that match nothing in the repository yet are kept, because they describe where the code will go.
-- Presets live in avflow and improve with every project; an organisation can add its own (for example a WPF + Zmotion preset that marks *Machine control* paths) in its team settings.
+- Presets live in avflow and improve with every project; an organisation can add its own (for example a preset for an in-house framework) in its team settings.
 - **Domain areas stay the project's job**: no preset can know where your money moves or your machine is driven.
 
 ## Checks catalogue
@@ -152,7 +152,7 @@ Projects compose risk areas from a **fixed list of checks**; avflow implements e
 
 **The CI job `avflow-risk-check`** (added by `avflow init`) is what turns the list into a gate. On every merge request pipeline it reads the profile, matches the changed files, and fails with a clear message when a required check is missing — so a risky change cannot merge with an unticked checklist, no review result or no owner approval.
 
-**Open point — GitLab tier.** Required code-owner approval is a GitLab **Premium** feature. On GitLab Free, CODEOWNERS shows the owners but does not block the merge; the `avflow-risk-check` job then provides the block by reading the MR's approvals through the API. To confirm on Enclave's GitLab before implementation.
+**GitLab tier.** Required code-owner approval is a GitLab **Premium** feature. On GitLab Free, CODEOWNERS shows the owners but does not block the merge; the `avflow-risk-check` job then provides the block by reading the MR's approvals through the API (with `gate = "fail"` and *Pipelines must succeed*). Enclave's GitLab is **Free** (confirmed Nov 13, 2026), so this job is the only code-owner gate there.
 
 ## Where settings live
 
@@ -218,8 +218,8 @@ checks = ["independent-review", "checklist:Rollback tested on a copy of producti
 
 | Ticket | Project | Facts | Required checks |
 | --- | --- | --- | --- |
-| Rename a label on the order screen | Mateo | No risk area; diff `source/Views/OrderWindow.xaml` | Standard flow only |
-| Add a pause command to the motion sequence | Mateo | Risk area Machine control on the ticket; diff `source/Zmotion/ZCommand.cs` | Plan confirmation, independent review, code owner (@q), *Tested on the test bench…* |
+| Rename a label on the order screen | Desktop app | No risk area; diff `source/Views/OrderWindow.xaml` | Standard flow only |
+| Add a pause command to the motion sequence | Desktop app | Risk area Machine control on the ticket; diff `source/Motion/MotionCommand.cs` | Plan confirmation, independent review, code owner (@q), *Tested on test hardware…* |
 | Show invoice totals on the dashboard | Web app | No risk area; diff `src/ui/dashboard/**` | Standard flow only |
 | Retry failed Stripe webhooks | Web app | No risk area; plan names `src/webhooks/stripe/retry.ts` | From the plan: stop for confirmation. At review: independent review, code owner, *Refund and failure paths tested* |
 
@@ -227,15 +227,15 @@ The fourth row is the case the old modes missed: nobody flagged the ticket, but 
 
 ## Migration from 2.x
 
-No ticket needs editing; members run `avflow update` and one command per project.
+Members run `avflow update` and one command per project; only open tickets that relied on *Machine-side* need a risk area.
 
 | 2.x | 3.0 behaviour |
 | --- | --- |
 | Mode field / `[avflow] mode=` notes | Ignored. The field can stay in Redmine; it is no longer read |
-| Machine-side field or line | Read as risk area **Other high risk** until mapped: the team setting `machine_side_area = "Machine control"` maps Mateo's *yes* to that area; the line parser accepts `Machine-side:`, `High risk:` and `Risk area:` |
+| Machine-side field or line | Ignored (no longer read — decided Nov 13, 2026, so avflow carries no project's concept). Open tickets get a **Risk area** instead; the line parser accepts `Risk area:` and `High risk:` |
 | Ticket in progress under DIRECT / PLAN / FULL | Continues; at review, `review_requirements` lists the checks from the profile |
 | Sensitive paths in `CLAUDE.md` / `CODEOWNERS` | Moved into `.avflow/project.toml` risk areas; `avflow risk sync` then regenerates CODEOWNERS |
-| Machine-specific text in avflow skills | Moves to Mateo's own project skills (for example `mateo-machine-review`) |
+| Project-specific text in avflow skills | Moves to that project's own skills (for example `<project>-hardware-review`) |
 
 **Per project, once:** run `avflow init` (adds `.avflow/project.toml` with examples and the CI job), describe the risk areas, `avflow risk check`, `avflow risk sync`, merge.
 
@@ -252,7 +252,7 @@ The design trades an early, explicit choice for checks driven by facts; these ar
 | Paths drawn too wide | Every change needs extra checks; people stop reading them | `avflow risk files` shows the effect before merging the profile; start narrow, widen with evidence |
 | The plan names no risky file but the diff touches one | No stop for plan confirmation; checks arrive only at review | Review still blocks the merge; the miss is reported so the profile or the plan quality can improve |
 | No upfront moment to think | Less deliberate start than the old FULL | A short plan note is mandatory for every ticket; risky areas can require `plan-confirmation` |
-| The CI gate depends on GitLab APIs and the tier | Owner approval may be checkable only through the API on GitLab Free | Verify before building; until then the job reports instead of failing |
+| The CI gate depends on GitLab APIs and the tier | Owner approval may be checkable only through the API on GitLab Free | Built on the API (works on Free and Premium); Enclave is Free, so the job is the gate |
 | More files to understand (`project.toml`) | One more concept for project leads | `avflow init` writes commented examples and the preset areas; one page in the user guide |
 
 What is **not** traded: the ticket rules in code, the guardrails, the secret scans, tests in every change and a person's review all stay as they are.
@@ -263,20 +263,22 @@ About 4–4.5 working days in three phases; each phase ends usable.
 
 **Decisions needed before building** (record the answers in `docs/decisions.md`)
 
-- [ ] Approve removing the four modes (one flow for every ticket).
-- [ ] Ticket field for the risk area: a Redmine list field (needs an admin; values follow each project's profile), or the `Risk area:` line in the description. For Enclave now: keep *Machine-side* mapped to *Machine control* during the transition?
-- [ ] Should the CI gate **fail** the pipeline from the start, or **report only** during the pilot?
-- [ ] Check Enclave's GitLab tier: is required code-owner approval available (Premium), or must the CI job check approvals?
-- [ ] Is a mandatory short plan note acceptable for every ticket, including one-line changes?
-- [ ] Strict default for new projects: which checks, and for how long by default?
-- [ ] Which stack presets ship first (.NET, Node, Python, Java, Go proposed), and should Enclave add a WPF + Zmotion preset for its machine projects?
+Answered Nov 13, 2026 — see `docs/decisions.md` (3.0).
+
+- [x] Approve removing the four modes (one flow for every ticket). — **Yes.**
+- [x] Ticket field for the risk area. — **Both: list field when it exists, `Risk area:` line otherwise.** (A Machine-side mapping was built in phase 1 and removed before release: avflow stays project-neutral.)
+- [x] Should the CI gate **fail** the pipeline from the start, or **report only** during the pilot? — **Report only in the pilot.**
+- [x] Check Enclave's GitLab tier: is required code-owner approval available (Premium), or must the CI job check approvals? — **Free: the CI job checks approvals through the API.**
+- [x] Is a mandatory short plan note acceptable for every ticket, including one-line changes? — **Yes.**
+- [x] Strict default for new projects: which checks, and for how long by default? — **Plan confirmation + independent review, 6 weeks.**
+- [x] Which stack presets ship first? — **All five; no organisation- or project-specific preset.**
 
 **Phases**
 
 | Phase | Scope | Effort | Usable after |
 | --- | --- | --- | --- |
-| 1 — Core | Profile file and validation, the ticket's risk area (with the Machine-side mapping), `[risk.other]` and `[risk.default]`, `start_ticket` without Mode, `assess_plan`, `review_requirements` with profile gaps, `avflow risk check/files` | 2 days | Agents follow one flow; required checks listed on MR and ticket |
+| 1 — Core | Profile file and validation, the ticket's risk area, `[risk.other]` and `[risk.default]`, `start_ticket` without Mode, `assess_plan`, `review_requirements` with profile gaps, `avflow risk check/files` | 2 days | Agents follow one flow; required checks listed on MR and ticket |
 | 2 — Enforcement and new projects | `avflow-risk-check` CI job (report-only switch), CODEOWNERS generation (`avflow risk sync`), checklist section in MRs, stack detection and five presets in `avflow init`, `avflow risk suggest` | 1.5–2 days | Risky changes cannot merge without their checks; new projects start with a profile |
-| 3 — Words and docs | Generic wording in all skills, `choose-mode` removed, Mateo's specifics moved to its project skills, user guide, test plan, sample project with a profile | 0.5 day | Ready for the pilot |
+| 3 — Words and docs | Generic wording in all skills (guarded by a test), `choose-mode` removed, no project's or customer's concepts left in avflow, user guide, test plan, sample project with a profile example and a project skill, the risk section of `avflow report` | 0.5 day (+0.5 for the report) | Ready for the pilot |
 
 After the pilot: tune the profile with `avflow report` data, then decide whether the CI gate fails by default.

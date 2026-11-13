@@ -114,6 +114,12 @@ def test_init_writes_team_status_names_into_ci(tmp_path):
     job = yaml.safe_load((tmp_path / ".gitlab-ci.avflow.yml").read_text())["avflow-ready-for-test"]
     assert job["variables"] == {"AVFLOW_STATUS_IN_REVIEW": "In Code Review", "AVFLOW_STATUS_READY_FOR_TEST": "Ready for testing"}
     assert "{status_" not in (tmp_path / ".gitlab-ci.avflow.yml").read_text()
+    gate = yaml.safe_load((tmp_path / ".gitlab-ci.avflow.yml").read_text())["avflow-risk-check"]
+    assert set(gate["variables"]) == {"GIT_DEPTH", "AVFLOW_FIELD_RISK_AREA"}
+    assert gate["variables"]["AVFLOW_FIELD_RISK_AREA"] == "Risk area" and gate["variables"]["GIT_DEPTH"] == "0"
+    assert gate["rules"] == [{"if": '$CI_PIPELINE_SOURCE == "merge_request_event"', "when": "always"}]
+    text = (tmp_path / ".gitlab-ci.avflow.yml").read_text()
+    assert "{field_" not in text and "MACHINE" not in text
 
 
 def test_status_plan_with_enclave_names():
@@ -138,3 +144,20 @@ def test_shipped_enclave_team_file_has_the_mapping():
     assert (tk["status_ready"], tk["status_in_progress"], tk["status_in_review"], tk["status_ready_for_test"]) == \
            ("New", "In Progress", "In Code Review", "Ready for testing")
     assert "Ready for testing" in tk["blocker_done"]
+
+
+def test_team_files_have_no_project_specific_fields():
+    import tomllib
+    from pathlib import Path
+    for f in (Path(__file__).parents[2] / "team" / "avflow-team.toml", Path(__file__).parents[1] / "src" / "avflow" / "data" / "team.toml"):
+        tk = tomllib.loads(f.read_text())["tickets"]
+        assert tk["field_risk_area"] == "Risk area"
+        assert not [k for k in tk if "machine" in k], f
+
+
+def test_a_2_6_personal_file_still_loads(tmp_path):
+    """Members update from 2.6.x: their personal file may still name the Mode or Machine-side field (no longer read)."""
+    f = tmp_path / "config.toml"
+    f.write_text('[tickets]\nfield_mode = "Chế độ"\nfield_machine_side = "Machine side"\nsomething_new = 1\n', encoding="utf-8")
+    c = Config.load(f, team={"tickets": {"url": "https://r.test"}})
+    assert c.tickets.field_risk_area == "Risk area" and not hasattr(c.tickets, "field_machine_side")

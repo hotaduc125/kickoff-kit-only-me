@@ -37,4 +37,4 @@ Waiting for (external): none
 Open questions: none
 
 ## Size and mode
-Estimate: 1 day · Proposed mode: (agent proposes) · Machine-side: no · Hotspot: src/sandbox/report.py
+Estimate: 1 day · Risk area: None · Hotspot: src/sandbox/report.py

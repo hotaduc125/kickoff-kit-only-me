@@ -9,7 +9,8 @@ A team harness around Claude Code, installed with one command on each developer'
 system (Redmine) and the repository/CI (GitLab), **equips** the agent (the team's coding workflow, team skills, role
 subagents), **guards** (ticket rules in code, git guardrails, secret scanning, plugin integrity) and **keeps machines in
 step** (`avflow check`, `avflow update`, team settings shipped with each release). It is used by Enclave (an IT company,
-ODC model); the first project using it is Mateo (WPF machine software for the customer WKKM, who shares the Redmine).
+ODC model) for any of its software projects; avflow itself is generic — nothing in it may depend on one project or
+customer (a customer may share the Redmine, so ticket rules assume it can read public notes).
 
 The repository owner is the PM (Alvin). Members install releases; they never see this repository.
 
@@ -17,22 +18,22 @@ The repository owner is the PM (Alvin). Members install releases; they never see
 
 | Path | What |
 |---|---|
-| `package/src/avflow/` | The Python package: CLI (`cli.py`), setup steps (`setup_steps.py`), configuration (`config.py`), MCP server (`tickets/`), git guardrails hook (`git_guard.py`), context monitor hook (`monitor.py`), `init_repo.py`, `release_notes.py`, `report.py`, `integrity.py` |
-| `package/src/avflow/tickets/` | MCP server `avflow-tickets`: `core.py` (the rules), `adapters/redmine.py` (Redmine REST), `server.py`, `audit.py` |
+| `package/src/avflow/` | The Python package: CLI (`cli.py`), setup steps (`setup_steps.py`), configuration (`config.py`), risk profile and required checks (`risk.py`), MCP server (`tickets/`), git guardrails hook (`git_guard.py`), context monitor hook (`monitor.py`), `init_repo.py`, `release_notes.py`, `report.py`, `integrity.py` |
+| `package/src/avflow/tickets/` | MCP server `avflow-tickets`: `core.py` (the rules), `adapters/redmine.py` (Redmine REST), `repo.py` (git / glab: profile, changed files, MR notes), `server.py`, `audit.py` |
 | `package/src/avflow/agents/` | Role subagent templates (`{model}` placeholder), generated into `~/.claude/agents/` by setup |
 | `package/src/avflow/templates/` | Files written into project repos by `avflow init` |
-| `package/src/avflow/data/` | `team.toml` (generic default; release.py replaces it with the team file), `plugin_manifest.json` (written by release.py) |
-| `package/tests/` | pytest suite; `fake_redmine.py` is an in-memory Redmine used by most ticket tests |
+| `package/src/avflow/data/` | `team.toml` (generic default; release.py replaces it with the team file), `presets.toml` (stack presets; bump `version` when one gains paths), `plugin_manifest.json` (written by release.py) |
+| `package/tests/` | pytest suite; `fake_redmine.py` is an in-memory Redmine, `fake_repo.py` a project repository (profile, changed files, MR notes) |
 | `plugin/` | The Claude Code plugin marketplace source: team skills and commands (`plugins/avflow/`) |
 | `team/avflow-team.toml` | **Team settings** for Enclave (URL, statuses, fields, workflow, models, monitor) — embedded into each release |
 | `scripts/` | `release.py`, `bootstrap.sh` / `.ps1` (install), `reset-avflow.sh` / `.ps1` (remove every trace, including old names) |
 | `docs/` | Decisions, designs, user guide, test plan, Windows test checklist |
-| `examples/avflow-sandbox/` | Small sample project (Python) with ready-made test tickets, used by the test plan |
+| `examples/avflow-sandbox/` | Small sample project (Python) with ready-made test tickets, a profile example and a sample project skill, used by the test plan |
 
 ## Commands
 
 ```bash
-cd package && python3 -m pytest -q                 # all tests (must stay green; ~195 tests, ~2 s)
+cd package && python3 -m pytest -q                 # all tests (must stay green; ~300 tests, ~1 s)
 cd package && pip wheel . --no-deps -w /tmp/whl    # build a wheel to try locally
 python3 scripts/release.py --marketplace-url https://github.com/alvin-enc/avflow-marketplace.git \
         --publish-to /tmp/fake-marketplace --skip-tests     # dry-run a release (no --push)
@@ -61,8 +62,9 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
   step with their `.sh` twins. Reset scripts must keep removing old names (kickoff-kit, htkm-kit, redmine-agent).
 - **Hooks** (`avflow-git-guard`, `avflow-monitor`) must never crash Claude Code: on any unexpected input, allow and exit 0.
   Only exit 2 for a deliberate block, with a clear message.
-- **Skills are generic team skills.** No project-specific words (machine, panel, test bench, Mateo) in avflow skills —
-  those belong to the project's own repository (decided for 3.0; some 2.x skills still contain them, see the design).
+- **Skills are generic team skills.** No project-specific words (machine, panel, test bench, a project's or customer's name) in avflow skills —
+  those belong to the project's own repository: its `.avflow/project.toml`, the *Test environments and languages*
+  section of its `CLAUDE.md`, and its own skills. `tests/test_skill_words.py` enforces it.
 - **Reuse first:** prefer Matt Pocock's or Superpowers' skills unchanged; adapt only when they write to the ticket system,
   contradict team conventions, or must exist for both workflows. Credit adapted skills (MIT).
 - **Deterministic vs judgement:** anything that can be computed (rules, matching, checks) is code with tests; skills only
@@ -82,8 +84,16 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 
 ## Current state (Nov 2026)
 
-- Version **2.6.2** in the repository. Releases to the marketplace may lag; check `git tag` and GitHub Releases.
-- Next work: **avflow 3.0** — one flow and project-defined risk (`docs/design/avflow-3.0.md`), in three phases. Several
-  decisions at the end of the design are still open: ask the PM before assuming an answer.
-- Known gaps: no GitHub Actions CI for this repository yet (the root `.gitlab-ci.yml` is a leftover); the CI gate's
-  GitLab-tier question; Windows scripts only partly tested; `avflow report` not yet run against the real Redmine/GitLab.
+- Version **3.0.0**, released Nov 13, 2026 (from branch `avflow-3.0-phase1`, not yet merged into `main`). Releases to the marketplace may lag; check `git tag` and GitHub Releases.
+- **avflow 3.0** — one flow and project-defined risk (`docs/design/avflow-3.0.md`). Decisions answered (see
+  `docs/decisions.md`; Enclave's GitLab is Free). **Phases 1–3 done** on branch `avflow-3.0-phase1`: profile and
+  validation (`risk.py`, standard library only — CI uses a copy), the ticket's risk area,
+  `start_ticket` without Mode, `assess_plan`, `review_requirements`, `avflow risk check/files/sync/suggest`, stack presets
+  (`data/presets.toml`), CODEOWNERS block, MR checklist section, CI gate `avflow-risk-check`; generic words in skills
+  (guarded by `tests/test_skill_words.py`), the *Test environments and languages* section in the `CLAUDE.md` template,
+  the sandbox profile example and project skill, the risk section of
+  `avflow report`. Next: the pilot (test plan on the real Redmine/GitLab), then decide whether the gate fails by default.
+- Before the pilot: IT must create the read-only Redmine account `ci-reader` for `REDMINE_READ_API_KEY` (decided
+  Nov 13); until then the CI gate reads the diff only and test E14 waits.
+- Known gaps: no GitHub Actions CI for this repository yet (the root `.gitlab-ci.yml` is a leftover); Windows scripts
+  only partly tested (`docs/WINDOWS_TEST.md` is current for 3.0 but not yet run on a Windows PC); `avflow report` not yet run against the real Redmine/GitLab.

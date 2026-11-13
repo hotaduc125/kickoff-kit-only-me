@@ -34,12 +34,15 @@ avflow update
 
 It downloads the latest release, installs it, updates the Claude Code plugin and runs the doctor. `avflow update --check` only tells you whether an update is available.
 
+**Updating from 2.x to 3.0:** run `avflow setup` once after `avflow update` (3.0 changes the role subagents, so `avflow check`
+reports them until then), and start a new Claude Code session. There are no modes any more; see the user guide.
+
 Do not edit the installed skills: `avflow check` reports changed files.
 
 ## Redmine without admin rights
 avflow works on a standard Redmine:
 - **Statuses:** the team settings map avflow's steps to the statuses your Redmine already has (for Enclave: Ready → New, In progress → In Progress, In review → In Code Review, Ready for test → Ready for testing). `avflow init` writes the same names into the CI job, so no CI variables are needed for them.
-- **Mode, Machine-side, Hotspot:** without custom fields, avflow reads Machine-side and Hotspot from the "Size and mode" line of the ticket description and keeps the confirmed mode in a private note starting with `[avflow]`.
+- **Risk area, Hotspot:** without custom fields, avflow reads them from the "Size and mode" line of the ticket description (`Risk area: …`, `Hotspot: …`); a risk area the agent adds is kept in a private note starting with `[avflow]`. There are no modes any more.
 - **Private notes still need the right role permissions** (an admin setting). Check with a customer test account that private notes are not visible before using real data.
 
 ## Team settings and personal overrides

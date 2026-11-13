@@ -1,5 +1,5 @@
 Subject: Add a date formatting helper
-Tracker: Task · Status: Ready · Target version: Release 1 · Estimated time: 2 · Assignee: you
+Tracker: Task · Status: Ready (Enclave: New) · Target version: Release 1 · Estimated time: 2 · Assignee: you
 
 ## Context
 Dates are formatted in several places with str(date). We want one helper so every screen shows dates the same way (YYYY-MM-DD).
@@ -30,4 +30,4 @@ Waiting for (external): none
 Open questions: none
 
 ## Size and mode
-Estimate: 1–2 h · Proposed mode: (agent proposes) · Machine-side: no · Hotspot: none
+Estimate: 1–2 h · Risk area: None · Hotspot: none

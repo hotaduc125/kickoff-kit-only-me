@@ -11,7 +11,7 @@ repository), **equips** the agent (the member's coding workflow and the team ski
 | Layer | What avflow does |
 |---|---|
 | **Connect** | Ticket system through the `avflow-tickets` MCP server (token in the OS keyring); repository and CI through the official CLI (`glab`) |
-| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `choose-mode`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the member chooses (for example Opus to plan and review, Sonnet to implement) |
+| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the member chooses (for example Opus to plan and review, Sonnet to implement) |
 | **Guard** | Ticket rules inside the MCP server (notes always private, only two status changes, …); git guardrails, including blocking commits that contain secrets (and a GitLab CI secret scan as the server-side backup); merge requests go to review only with a green pipeline; integrity check of the installed skills |
 | **Keep in step** | `avflow check` and `avflow update`: everyone runs the same version of the workflow |
 | **Observe** | A context monitor records the context size of every session and subagent, warns before it grows past the team's thresholds, and `avflow usage` summarises it |
@@ -31,6 +31,11 @@ original writes directly to a ticket the customer can read, when it differs from
 the originals and credit them (MIT): `triage` from `triage`, `glossary` and `adr` from `domain-modeling`, and the git
 guardrails from `git-guardrails-claude-code`.
 
+**Generic team skills, project skills in the project.** avflow's skills use generic words (risk area, test environment,
+the customer's environment) and a test keeps project words out of them. Each project keeps its own specifics: risk areas
+in `.avflow/project.toml`, test environments and languages in its `CLAUDE.md`, and its own skills in
+`.claude/skills/<project>-…/`.
+
 **What avflow is not**
 
 - **Not an agent.** It writes no code; Claude Code is the agent.
@@ -39,7 +44,7 @@ guardrails from `git-guardrails-claude-code`.
 
 **Today and next**
 
-| | Today (2.x) | Planned |
+| | Today (3.x) | Planned |
 |---|---|---|
 | Ticket system | Redmine | Jira, GitLab Issues, GitHub Issues (adapter architecture and handling rules are ready) |
 | Repository and CI | GitLab | GitHub (`gh`, GitHub Actions) |
@@ -49,7 +54,7 @@ guardrails from `git-guardrails-claude-code`.
 
 | Plugin | Contents |
 |---|---|
-| `avflow` | Skills: `tickets`, `workflow`, `choose-mode`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr` · Commands: `/avflow:next-ticket`, `/avflow:check` |
+| `avflow` | Skills: `tickets`, `workflow`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr` · Commands: `/avflow:next-ticket`, `/avflow:check` |
 
 Installed automatically by `avflow setup`. Manual install in Claude Code:
 

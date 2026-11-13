@@ -26,9 +26,9 @@ class TicketConfig:
     status_in_progress: str = "In progress"
     status_in_review: str = "In review"
     status_ready_for_test: str = "Ready for test"   # set by the CI job after a merge
-    field_mode: str = "Mode"
-    field_machine_side: str = "Machine-side"
+    field_mode: str = "Mode"                   # 2.x only: no longer read since 3.0 (kept so old files load)
     field_hotspot: str = "Hotspot"
+    field_risk_area: str = "Risk area"         # list field; without it, the "Risk area:" description line
     tracker_bug: str = "Bug"
     blocker_done: list[str] = field(default_factory=lambda: ["Ready for test", "Resolved", "Closed"])
     mr_url_prefix: str = ""

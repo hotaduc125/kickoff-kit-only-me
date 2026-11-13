@@ -92,8 +92,9 @@ def test_update_plugin_runs_without_mocks():
 def test_every_setup_step_name_resolves():
     """Static check: no function in setup_steps or cli refers to a name that does not exist."""
     import ast, builtins, inspect
-    from avflow import cli as cli_mod, git_guard, init_repo, monitor, release_notes, report as report_mod
-    for mod in (st, cli_mod, git_guard, init_repo, monitor, release_notes, report_mod):
+    from avflow import cli as cli_mod, git_guard, init_repo, monitor, release_notes, report as report_mod, risk
+    from avflow.tickets import core, repo
+    for mod in (st, cli_mod, git_guard, init_repo, monitor, release_notes, report_mod, risk, core, repo):
         tree = ast.parse(inspect.getsource(mod))
         defined = set(dir(mod)) | set(dir(builtins))
         tops = [n for n in tree.body if isinstance(n, ast.FunctionDef)]

@@ -28,9 +28,9 @@ Merely *reading* `docs/CONTEXT.md` for vocabulary is not this skill — every sk
 Propose each resolved term as a change to `docs/CONTEXT.md`, in the same merge request as the work (or its own small one). A person reviews it like any code change.
 
 ```markdown
-**Nulling**:
-Correcting the panel position until the camera targets are within tolerance.
-_Avoid_: alignment loop, correction
+**Settlement**:
+The moment an order's payment is final and can no longer be cancelled.
+_Avoid_: completion, closing
 ```
 
 Rules:

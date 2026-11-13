@@ -1,6 +1,6 @@
 {
   "name": "avflow",
-  "version": "2.6.2",
+  "version": "3.0.0",
   "description": "Team skills and commands for the ticket → coding agent → merge request → CI → review → merge workflow. Works with the avflow-tickets MCP server installed by `avflow setup`.",
   "author": { "name": "Enclave" }
 }

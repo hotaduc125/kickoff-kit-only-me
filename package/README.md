@@ -3,10 +3,10 @@
 One command sets up the team's AI coding workflow on a developer's machine:
 
 - **ticket system** (v1: Redmine; planned: Jira, GitLab Issues, GitHub Issues) through the `avflow-tickets` MCP server —
-  nine tools, the same for every system, with the team rules enforced in code;
+  eleven tools, the same for every system, with the team rules enforced in code;
 - **repository and CI/CD** (v1: GitLab via `glab`; planned: GitHub via `gh`);
 - **Claude Code** with the member's **coding workflow** — **Superpowers** or a curated set of **Matt Pocock's** skills (pinned commit) — the **git guardrails** hook, Matt Pocock's `handoff` skill and the **avflow plugin**
-  (team skills `tickets`, `workflow`, `choose-mode`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr`, commands `/avflow:next-ticket`, `/avflow:check`);
+  (team skills `tickets`, `workflow`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr`, commands `/avflow:next-ticket`, `/avflow:check`);
 - a final **check** (whoami on the ticket system, MCP registration, GitLab login, workflow, guardrails, plugins, skills).
 
 Tokens are asked once, verified, and stored in the **OS keyring** (macOS Keychain, Windows Credential Manager). They are
@@ -21,7 +21,7 @@ repository), **equips** the agent (the member's coding workflow and the team ski
 | Layer | What avflow does |
 |---|---|
 | **Connect** | Ticket system through the `avflow-tickets` MCP server (token in the OS keyring); repository and CI through the official CLI (`glab`) |
-| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `choose-mode`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the member chooses (for example Opus to plan and review, Sonnet to implement) |
+| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the member chooses (for example Opus to plan and review, Sonnet to implement) |
 | **Guard** | Ticket rules inside the MCP server (notes always private, only two status changes, …); git guardrails, including blocking commits that contain secrets (and a GitLab CI secret scan as the server-side backup); merge requests go to review only with a green pipeline; integrity check of the installed skills |
 | **Keep in step** | `avflow check` and `avflow update`: everyone runs the same version of the workflow |
 | **Observe** | A context monitor records the context size of every session and subagent, warns before it grows past the team's thresholds, and `avflow usage` summarises it |
@@ -41,6 +41,11 @@ original writes directly to a ticket the customer can read, when it differs from
 the originals and credit them (MIT): `triage` from `triage`, `glossary` and `adr` from `domain-modeling`, and the git
 guardrails from `git-guardrails-claude-code`.
 
+**Generic team skills, project skills in the project.** avflow's skills use generic words (risk area, test environment,
+the customer's environment) and a test keeps project words out of them. Each project keeps its own specifics: risk areas
+in `.avflow/project.toml`, test environments and languages in its `CLAUDE.md`, and its own skills in
+`.claude/skills/<project>-…/`.
+
 **CI stays in GitLab.** avflow has no CI of its own: the judge of quality must be independent of the agent's tools. avflow checks early on the developer's machine (guardrails, tests before the merge request) and provides the CI templates; the project's pipeline decides.
 
 **What avflow is not**
@@ -51,7 +56,7 @@ guardrails from `git-guardrails-claude-code`.
 
 **Today and next**
 
-| | Today (2.x) | Planned |
+| | Today (3.x) | Planned |
 |---|---|---|
 | Ticket system | Redmine | Jira, GitLab Issues, GitHub Issues (adapter architecture and handling rules are ready) |
 | Repository and CI | GitLab | GitHub (`gh`, GitHub Actions) |
@@ -78,23 +83,31 @@ Manual alternative: `uv tool install <wheel or package>` then `avflow setup`.
 | `avflow check` | Check that everything works (also tells you when an update is available) |
 | `avflow update` | Install the latest release and update the plugin (`--check` only reports) |
 | `avflow config` | Show the settings and which are personal (never the token); `--edit`, `--path`, `--reset` (back to the team settings) |
-| `avflow init` | Add the team's standard files to a project repository (CLAUDE.md, docs/CONTEXT.md, ADR, CODEOWNERS, MR template, `.gitattributes`, `.editorconfig`, GitLab CI jobs: MR title check, secret scan with gitleaks, ticket to *Ready for test* after merge); never overwrites without `--force` |
-| `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the tickets referenced by the commits |
+| `avflow init` | Add the team's standard files to a project repository (CLAUDE.md, docs/CONTEXT.md, ADR, CODEOWNERS, MR template, `.gitattributes`, `.editorconfig`, GitLab CI jobs: MR title check, secret scan with gitleaks, ticket to *Ready for test* after merge, `avflow-risk-check`) and `.avflow/project.toml` from the detected stack presets (`--stack dotnet,node,…`); never overwrites without `--force` |
+| `avflow risk check` · `files <paths…> [--area <name>]` · `sync` · `suggest` | The project's risk profile (`.avflow/project.toml`): validate it; show which areas and checks apply to files; regenerate the CODEOWNERS block and the CI copy; propose paths from profile gaps (read-only) |
+| `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the tickets referenced by the commits, marked with their risk areas |
 | `avflow usage` | Context size per session (orchestrator) and subagent calls with their models, from the context monitor |
-| `avflow report --project <id>` | Weekly PM report (read-only): progress per release, tickets over estimate, reopened tickets, merge-request flow |
+| `avflow report --project <id>` | Weekly PM report (read-only): progress per release, tickets over estimate, reopened tickets, the risk of the reviewed changes (high-risk share, areas found only at review, profile gaps), merge-request flow |
 | `avflow uninstall` | Remove the configuration, token and MCP registration (keeps Superpowers) |
 
-## The nine ticket tools
-`whoami` · `list_my_ready_tickets` · `get_ticket` · `add_private_note` (always private) · `set_fields` (Mode,
-Machine-side, Hotspot) · `find_hotspot_conflicts` · `start_ticket` (refused if not assigned, blocked, not Ready or no Mode)
-· `submit_for_review` (needs the merge / pull request URL) · `create_bug_draft` (private draft).
+## The eleven ticket tools
+`whoami` · `list_my_ready_tickets` · `get_ticket` · `add_private_note` (always private) · `set_fields` (adds a risk area
+with a reason — never removes one — and sets Hotspot) · `find_hotspot_conflicts` · `start_ticket` (refused if not
+assigned, blocked or not Ready; returns the checks of the ticket's risk area) · `assess_plan` (posts the plan with its
+files; stop / continue / spike) · `review_requirements` (final checks from the branch's changed files, posted on the MR
+and the ticket) · `submit_for_review` (needs the merge / pull request URL, after `review_requirements`) ·
+`create_bug_draft` (private draft).
+
+Required checks are computed from facts — the ticket's risk area, the planned files, the changed files — against the
+project's `.avflow/project.toml`, and only ever grow. See `docs/design/avflow-3.0.md`.
 
 ## Ticket system setup (Redmine)
-Best: REST API enabled; statuses Ready, In progress, In review, Ready for test; custom fields Mode (list), Machine-side (boolean),
-Hotspot (text); tracker Bug; the customer role must not view private notes.
+Best: REST API enabled; statuses Ready, In progress, In review, Ready for test; custom fields Risk area (list), Hotspot (text);
+tracker Bug; the customer role must not view private notes.
 
-Without admin rights: setup maps the workflow onto Redmine's default statuses, and avflow reads Machine-side and Hotspot
-from the "Size and mode" line of the description and keeps the confirmed mode in a private `[avflow]` note.
+Without admin rights: setup maps the workflow onto Redmine's default statuses, and avflow reads the risk area and Hotspot
+from the "Size and mode" line of the description (`Risk area: …`); a risk area the agent adds is kept in a private
+`[avflow]` note.
 
 ## Development
 `uv run pytest` · adapters: see `docs/ADAPTERS.md` · release: tag `vX.Y.Z` → CI publishes the package.

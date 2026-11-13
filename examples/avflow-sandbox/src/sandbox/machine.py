@@ -1,6 +1,7 @@
-"""Simulated machine control — the project's SENSITIVE PATH (stands in for machine-side code such as ZCommand).
+"""Simulated machine control — the project's risk area "Machine control" (see .avflow/project.toml).
 
-Changes here are mode FULL, need a code-owner review, and must keep the safety checks below.
+Changes here require plan confirmation, an independent review, a code-owner approval and a test by someone other
+than the author, and must keep the safety checks below.
 """
 from __future__ import annotations
 

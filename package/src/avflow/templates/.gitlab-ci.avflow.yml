@@ -1,7 +1,15 @@
 # avflow jobs — include from .gitlab-ci.yml with:
 #   include:
 #     - local: .gitlab-ci.avflow.yml
-# CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY (masked, protected; a dedicated CI account).
+# CI/CD variables: REDMINE_URL (not protected — it is not a secret), REDMINE_CI_API_KEY (masked, protected; a
+#   dedicated CI account that moves tickets after a merge), REDMINE_READ_API_KEY (masked, NOT protected; a separate
+#   read-only account — role with only View issues + View private notes — so avflow-risk-check can read the ticket in
+#   merge request pipelines; without it, that job falls back to REDMINE_CI_API_KEY where available),
+#   AVFLOW_GITLAB_TOKEN (masked; a project access token, role Reporter, scope read_api — lets avflow-risk-check read
+#   the MR's approvals, notes and description).
+# avflow-risk-check lists the checks a merge request needs (risk areas in .avflow/project.toml, read from the TARGET
+# branch) and whether they are done. `[ci] gate = "report"` only reports; "fail" fails the job. Approving an MR does
+# not start a pipeline: re-run this job after approving.
 # avflow-secret-scan is the server-side backup of the local git guardrails: it scans the commits of every
 # merge request and every push to develop. Update the pinned gitleaks version deliberately.
 
@@ -45,3 +53,16 @@ avflow-ready-for-test:
   script:
     - apt-get update -qq && apt-get install -y -qq git > /dev/null
     - python ci/avflow_redmine_update.py
+
+avflow-risk-check:
+  stage: .post
+  image: python:3.12-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
+  variables:                       # the team's ticket field names, written by `avflow init`
+    GIT_DEPTH: "0"
+    AVFLOW_FIELD_RISK_AREA: "{field_risk_area}"
+  script:
+    - apt-get update -qq && apt-get install -y -qq git > /dev/null
+    - python ci/avflow_risk_check.py

@@ -1,6 +1,6 @@
 ---
 name: workflow
-description: Use whenever a ticket's mode (DIRECT, PLAN, FULL, SPIKE) has been confirmed and work is about to start, or when you are unsure which design, planning, implementation, testing, debugging or review skill to use. Defines what each mode requires and maps every requirement to the installed workflow — Superpowers or Matt Pocock's skills.
+description: Use whenever a ticket has been started and work is about to begin, when a required check (plan-confirmation, independent-review, code-owner, checklist) must be satisfied, or when you are unsure which design, planning, implementation, testing, debugging or review skill to use. Describes the one ticket flow and maps every step to the installed workflow — Superpowers or Matt Pocock's skills.
 ---
 
 # Team workflow
@@ -14,16 +14,29 @@ Look at the skills available to you to know which one is installed. Never mix th
 
 The **requirements** below are the same for everyone; only the skill that meets them differs.
 
-## What each mode requires
+## One flow for every ticket
 
-| Mode | Requirements, in order |
+There are no modes. Every ticket follows the same steps (the `tickets` skill has the tool calls); the amount of process
+comes from the **required checks** that `start_ticket`, `assess_plan` and `review_requirements` return:
+
+1. Start → short **plan** (approach, files, tests) → `assess_plan`.
+2. If the checks include `plan-confirmation` → **stop** until the person confirms the plan.
+3. Implement, **tests first** → merge request → green pipeline.
+4. `review_requirements` → do the checks that are yours → `submit_for_review`.
+
+A spike stops after the plan: findings as a private note, **no production code**.
+
+| Check | How it is satisfied |
 |---|---|
-| **DIRECT** | Implement with tests (test first when practical) → open the merge request |
-| **PLAN** | Short design check → **plan** (steps and files, as a private note) → implement in batches, **stop for the person after each batch** → tests first → merge request |
-| **FULL** | Design clarified with the person → plan as a private note → implement with tests first → **independent two-stage review** (spec, then code quality) by the `qa-agent` skill → person review (code owner) → merge request |
-| **SPIKE** | Time-boxed investigation or prototype → findings as a private note → **no production code** |
+| `plan-confirmation` | Stop after `assess_plan`; the assignee confirms the plan in the session before any code |
+| `independent-review` | `qa-agent` section E: two-stage review by the `avflow-reviewer` subagent in a fresh context; the MR note `### avflow — independent review` … `Verdict: approve` |
+| `code-owner` | One of the area's owners approves the MR — a person; list it for them, never approve yourself. The owner re-runs `avflow-risk-check` after approving |
+| `checklist:<text>` | A person ticks that item in the avflow section of the MR description — never tick it yourself |
 
-For legacy code without tests, or before touching a sensitive path, run `zoom-out` first.
+**Always required, whatever the risk:** tests for each acceptance criterion, a green pipeline, a person's review and
+merge, a handoff note.
+
+For legacy code without tests, or before touching a risk area's paths, run `zoom-out` first.
 
 ## Who does each step — the role subagents
 
@@ -32,11 +45,11 @@ For legacy code without tests, or before touching a sensitive path, run `zoom-ou
 
 | Step | Delegate to | Notes |
 |---|---|---|
-| Design and plan (PLAN, FULL) | **`avflow-planner`** | Read-only. Post its plan with `add_private_note` and wait for the person to confirm |
-| Implementation of the confirmed plan (PLAN, FULL) | **`avflow-implementer`** | One batch per call in PLAN mode; stop for the person after each batch |
-| Two-stage review (FULL, or when the person asks) | **`avflow-reviewer`** | Fresh context; never the subagent that implemented |
+| Design and plan (larger tickets, or any ticket in a risk area) | **`avflow-planner`** | Read-only. Pass its plan and files to `assess_plan` |
+| Implementation of the plan | **`avflow-implementer`** | After the confirmation when `plan-confirmation` is required |
+| Two-stage review (`independent-review`, or when the person asks) | **`avflow-reviewer`** | Fresh context; never the subagent that implemented |
 
-DIRECT tickets and SPIKEs can be done in the main session. Tickets, the merge request and anything the person must
+Small changes and spikes can be done in the main session. Tickets, the merge request and anything the person must
 confirm stay in the **main session** — subagents return their result to it. If a role subagent is missing, say so and
 suggest `avflow check`; do not silently skip the step.
 
@@ -45,12 +58,12 @@ suggest `avflow check`; do not silently skip the step.
 | Requirement | Superpowers | Matt Pocock's skills |
 |---|---|---|
 | Clarify the design | `brainstorming` | `grill-with-docs` |
-| Write the plan | `writing-plans`, then post it with `add_private_note` | Write it yourself (steps, files, tests) and post it with `add_private_note` — **do not** use skills that publish to an issue tracker |
+| Write the plan | `writing-plans`, then pass it to `assess_plan` | Write it yourself (steps, files, tests) and pass it to `assess_plan` — **do not** use skills that publish to an issue tracker |
 | Implement in batches with checkpoints | `executing-plans` | `implement`, stopping after each batch |
-| Implement a FULL ticket | `subagent-driven-development` | `implement` |
+| Implement a larger or high-risk change | `subagent-driven-development` | `implement` |
 | Tests first | `test-driven-development` | `tdd` |
 | Debug a failure | `systematic-debugging` | `diagnosing-bugs` |
-| Independent review (FULL) | `qa-agent` section E | `qa-agent` section E (it may use `code-review`) |
+| Independent review (`independent-review`) | `qa-agent` section E | `qa-agent` section E (it may use `code-review`) |
 | Spike / prototype | investigate and note findings | `prototype`, `research` |
 | Module design | — | `codebase-design`, `improve-codebase-architecture` |
 | Merge request description | team MR template | `pr`, following the team MR template |
@@ -67,5 +80,5 @@ suggest `avflow check`; do not silently skip the step.
 - **Keep the orchestrator's context small.** Delegate reading large areas of code, implementation and review to the role subagents; they start with a fresh context. When the context monitor reports the warning threshold, plan a handoff; past the limit, stop starting new work, write the handoff as a private note and ask the person to start a new session.
 
 - Tickets are read and written **only** through the `tickets` skill (avflow-tickets MCP server). No other skill may create, publish or comment on tickets.
-- Plans, findings and handoffs are **private notes** on the ticket.
+- Plans go through `assess_plan`; findings and handoffs are **private notes** on the ticket.
 - Git safety guardrails may block some commands (push to protected branches, force push, `reset --hard`, …). If a command is blocked, do not try to work around it — tell the person.

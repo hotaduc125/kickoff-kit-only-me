@@ -1,7 +1,8 @@
 """avflow report: weekly PM metrics from the ticket system (and GitLab, when glab works in the repository).
 
 Read-only. Metrics follow the team's working model: progress per release, tickets over estimate,
-reopened tickets, merge-request flow and first-pipeline success.
+reopened tickets, merge-request flow and first-pipeline success, and (3.0) the risk of the reviewed changes —
+taken from the private '[avflow] required' notes that start_ticket, assess_plan and review_requirements write.
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import statistics
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
+from . import risk
 from . import setup_steps as st
 
 BUCKETS = ["New / Ready", "In progress", "In review", "Ready for test", "Done"]
@@ -68,6 +70,58 @@ def mr_metrics(mrs: list[dict], first_pipeline: dict[int, str]) -> dict:
             "first_pipeline_green": f"{sum(s == 'success' for s in known)}/{len(known)}" if known else None}
 
 
+def risk_summary(journals_by_issue: dict[int, list[dict]], since: datetime) -> dict:
+    """Tickets whose review_requirements ran in the period, from their PRIVATE '[avflow] required' notes.
+
+    Public notes are ignored (anyone, including the customer, can write one). Each area keeps where it was first found:
+    "ticket" (the ticket named it), "plan" (planned files) or "review" (only in the diff — the plan missed it).
+    """
+    out: dict = {"reviewed": [], "high_risk": [], "default_only": [], "areas": {}, "missed_at_plan": {}, "gaps": {}}
+    for iid in sorted(journals_by_issue):
+        private = [j for j in journals_by_issue[iid] if j.get("private_notes")]
+        reviewed = any((j.get("notes") or "").startswith(risk.REQUIRED) and '"stage": "review"' in (j.get("notes") or "")
+                       and (_dt(j.get("created_on")) or since) >= since for j in private)
+        if not reviewed:
+            continue
+        req = risk.required_from_notes([j.get("notes") or "" for j in private])
+        out["reviewed"].append(iid)
+        if req["areas"]:
+            out["high_risk"].append(iid)
+        elif req["checks"]:
+            out["default_only"].append(iid)
+        for area, src in req["areas"].items():
+            row = out["areas"].setdefault(area, {"ticket": [], "plan": [], "review": []})
+            row[src if src in row else "ticket"].append(iid)
+        missed = [a for a, src in req["areas"].items() if src == "review"]
+        if missed:
+            out["missed_at_plan"][iid] = missed
+        if req["gaps"]:
+            out["gaps"][iid] = req["gaps"]
+    return out
+
+
+def risk_section(s: dict) -> list[str]:
+    n = len(s["reviewed"])
+    lines = [f"## Risk ({n} ticket{'' if n == 1 else 's'} reviewed in the period)", ""]
+    if not n:
+        return lines + ["- No ticket reached review_requirements in the period.", ""]
+    hr = len(s["high_risk"])
+    lines.append(f"- High-risk changes: {hr} of {n} ({round(100 * hr / n)}%)"
+                 + (f" · strict default only: {len(s['default_only'])}" if s["default_only"] else ""))
+    if s["areas"]:
+        lines += ["", "| Risk area | Tickets | From the ticket | Found at plan | Found only at review |", "|---|---|---|---|---|"]
+        for area, row in sorted(s["areas"].items(), key=lambda kv: (-sum(map(len, kv[1].values())), kv[0])):
+            lines.append(f"| {area} | {sum(map(len, row.values()))} | {len(row['ticket'])} | {len(row['plan'])} | {len(row['review'])} |")
+    lines += ["", f"### Found only at review — the ticket and the plan missed them ({len(s['missed_at_plan'])})", ""]
+    lines += [f"- #{i}: {', '.join(a)}" for i, a in s["missed_at_plan"].items()] or ["- none"]
+    lines += ["", f"### Profile gaps — files of high-risk tickets outside every area ({len(s['gaps'])})", ""]
+    lines += [f"- #{i}: " + ", ".join(f"`{g}`" for g in gs) for i, gs in s["gaps"].items()] or ["- none"]
+    if s["gaps"]:
+        lines.append("- Run `avflow risk suggest` in the project repository for the paths to add.")
+    lines.append("")
+    return lines
+
+
 def _dt(s):
     if not s:
         return None
@@ -122,6 +176,7 @@ def build_report(adapter, cfg, project: str, days: int = 7, runner=st.run, now: 
     re_ids = reopened(journals, done_ids, since)
     lines += ["", f"## Reopened in the period ({len(re_ids)})", ""]
     lines += [f"- #{i}" for i in re_ids] or ["- none"]
+    lines += ["", *risk_section(risk_summary(journals, since))][:-1]
     g = gitlab_mrs(since, None, runner)
     lines += ["", "## Merge requests (GitLab)", ""]
     if g is None:

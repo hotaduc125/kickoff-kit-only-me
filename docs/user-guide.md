@@ -1,6 +1,6 @@
 # avflow user guide (macOS & Windows)
 
-For avflow **2.6.2**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
+For avflow **3.0.0**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
 the same change as any behaviour it describes.
 
 ## What avflow is
@@ -10,7 +10,7 @@ avflow sets up the team's AI coding workflow with one command and keeps it in st
 After installing, your machine has:
 
 - **The `avflow-tickets` MCP server**: 9 tools for the agent to work with Redmine tickets, with the team rules built into the code (notes are always private; the agent may only start a ticket and submit it for review).
-- **The avflow plugin**: the team skills — `tickets`, `workflow`, `choose-mode`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr` — and two shortcuts, `/avflow:next-ticket` and `/avflow:check`.
+- **The avflow plugin**: the team skills — `tickets`, `workflow`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr` — and two shortcuts, `/avflow:next-ticket` and `/avflow:check`.
 - **The coding workflow** of the team: Superpowers, or a curated set of Matt Pocock's skills. One or the other, never both.
 - **Three role subagents** — planner, implementer, reviewer — each on the model chosen for that kind of work.
 - **Git guardrails**: dangerous git commands, and commits that contain secrets, are blocked before the agent can run them.
@@ -41,7 +41,7 @@ No `uv`? No problem: the install script installs it.
 
 Download the release files into one folder, run the install script, enter your token; about 10 minutes.
 
-**1. Download the release files** (replace `<version>` with the version the PM announces, for example `2.6.2`):
+**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.0`):
 
 ```bash
 gh release download v<version> --repo alvin-enc/avflow-marketplace
@@ -67,19 +67,19 @@ If setup reports that the team's statuses are missing in Redmine, tell the PM.
 
 **4. Open a new terminal window** (so the `avflow` command is on your PATH), then run `avflow check`: every line should be ✅ (➖ lines are only information).
 
-**5. Start a new Claude Code session** and type `/mcp`: you should see `avflow-tickets` with 9 tools.
+**5. Start a new Claude Code session** and type `/mcp`: you should see `avflow-tickets` with 11 tools.
 
 The coding workflow, models and thresholds are **team settings**: everyone works the same way unless the PM agrees otherwise. `avflow config` shows them.
 
 ## Redmine without admin rights
 
-avflow works best when an admin has added three custom fields (Mode, Machine-side, Hotspot) and the team's statuses. Without them, avflow still works on a standard Redmine:
+avflow works best when an admin has added the custom fields (Risk area, Hotspot) and the team's statuses. Without them, avflow still works on a standard Redmine:
 
 | What | With an admin's setup | Without |
 | --- | --- | --- |
 | Statuses | Ready · In progress · In review · Ready for test | The statuses Redmine already has, mapped in the team settings — for Enclave: Ready → **New** · In progress → **In Progress** · In review → **In Code Review** · Ready for test → **Ready for testing** |
-| Machine-side, Hotspot | Custom fields | The **Size and mode** line at the end of the ticket description, written by the person |
-| Mode | Custom field | A private note starting with `[avflow] mode=…`, written by the agent after you confirm the mode |
+| Risk area, Hotspot | Custom fields (Risk area: a list field) | The **Size and mode** line at the end of the ticket description, written by the person |
+| A risk area the agent adds | — (the agent never writes the field) | A private note starting with `[avflow] risk-area=…`, with the agent's reason |
 
 avflow uses the custom fields whenever they exist, so nothing changes on the tickets when an admin adds them later — just run `avflow setup` again.
 
@@ -92,30 +92,97 @@ Two things still matter:
 
 ## Daily use: working a ticket
 
-The agent does most of the work, but three decisions are always yours: **confirming the mode**, **reviewing and merging**, and **closing the ticket**.
+The agent does most of the work, but three decisions are always yours: **confirming the plan** when a risky change needs it, **reviewing and merging**, and **closing the ticket**. There are no modes to choose: every ticket follows the same flow, and the extra checks come from the ticket's **risk area** and the **files** the change touches (see *Risk areas* below).
 
 Open a terminal in the project repository (latest `develop`), run `claude`, then:
 
-1. **Type `/avflow:next-ticket`.** The agent takes the highest-priority Ready ticket assigned to you, reads it, checks for blocking tickets, and **proposes a mode** (DIRECT, PLAN, FULL, SPIKE) in a private note. For a specific ticket: `/avflow:next-ticket 1234`.
-2. **Confirm the mode**, for example *"OK, plan mode, go ahead"*. The agent moves the ticket to **In progress**.
-3. **The agent works in that mode** with the team's workflow (the `workflow` skill guides each step): the planner subagent designs and plans when needed, then the implementer writes the tests first and the code. In PLAN mode it **stops after each batch** so you can review.
-4. **The agent opens the merge request** from branch `feature/<id>-<name>`, with `Refs #<id>` in the title, waits for its first pipeline — fixing the cause until it is green, never weakening a test — and only then moves the ticket to **In review**.
-5. **For FULL tickets**, the reviewer subagent runs the **two-stage review** (`qa-agent`): spec first, then code quality.
-6. **A person reviews and merges.** The agent never merges, and cannot push to `develop` or `main`. After the merge, the project's CI job moves the ticket to **Ready for test** with a private note linking the commit and the pipeline — or, in projects without that job, a person does it.
+1. **Type `/avflow:next-ticket`.** The agent takes the highest-priority Ready ticket assigned to you, reads it, checks for blocking tickets, moves it to **In progress** and tells you the risk areas and the **required checks**. For a specific ticket: `/avflow:next-ticket 1234`.
+2. **The agent writes a short plan** (approach, files, tests) — for every ticket, even a one-line change — and posts it as a private note together with the risk check (`assess_plan`). If the plan names files in a risk area, checks are added.
+3. **Confirm the plan** when the agent says it must stop (the `plan-confirmation` check), for example *"Plan OK, go ahead"*. `/avflow:next-ticket` always stops here so you can look at the plan.
+4. **The agent implements** with the team's workflow (the `workflow` skill guides each step): the planner subagent plans larger or risky work, the implementer writes the tests first and the code.
+5. **The agent opens the merge request** from branch `feature/<id>-<name>`, with `Refs #<id>` in the title, and waits for its first pipeline — fixing the cause until it is green, never weakening a test. Then it lists the **final required checks** from the files the branch really changed (`review_requirements`), posts them on the MR and the ticket, writes the checklist items into an avflow section of the MR description, does its own checks — for `independent-review`, the reviewer subagent's two-stage review (spec, then code quality), posted as an MR note — and only then moves the ticket to **In review**. Owner approvals and checklist items are for people; the agent never ticks them.
+6. **A person reviews and merges**, after the required checks are done. The CI job **`avflow-risk-check`** shows on every merge request which checks are done and which are missing (see *The CI gate* below). Code owners: after approving, **re-run that job** — an approval does not start a pipeline. The agent never merges, and cannot push to `develop` or `main`. After the merge, the project's CI job moves the ticket to **Ready for test** with a private note linking the commit and the pipeline — or, in projects without that job, a person does it.
 7. **At the end of the session**, ask the agent for a **handoff** (what was done, what is left, how to verify) as a private note.
 8. **After testing or acceptance**, a person moves the ticket to **Resolved**, then **Closed**.
 
-Every note the agent writes on a ticket is a **private note**; the customer cannot see it. If the agent refuses to start (the ticket is not assigned to you, is blocked, is not Ready, or has no mode), read the reason it gives: that is a team rule, not a bug. You can always change the proposed mode: *"Use PLAN mode for this ticket."*
+Every note the agent writes on a ticket is a **private note**; the customer cannot see it. If the agent refuses to start (the ticket is not assigned to you, is blocked, is not Ready, or the project's `.avflow/project.toml` has errors), read the reason it gives: that is a team rule, not a bug. You can always ask for more care — *"Treat this as Other high risk"* — the agent adds the risk area with a reason. Only a person can remove one, by editing the ticket.
+
+## Risk areas
+
+A change is **high risk** when its ticket names a **risk area**, or when its plan or its diff touches the paths of a
+risk area. Each project lists its areas in **`.avflow/project.toml`** (reviewed by merge request like any code):
+
+```toml
+[[risk.area]]
+name   = "Payments"
+paths  = ["src/billing/**", "src/payments/**"]
+owners = ["@lead"]
+checks = ["plan-confirmation", "independent-review", "code-owner",
+          "checklist:Tested on the staging system by someone other than the author"]
+
+[risk.other]                 # the ticket's "Other high risk"
+checks = ["plan-confirmation", "independent-review"]
+
+[risk.default]               # optional: every change outside all areas, until a date (new projects)
+checks = ["plan-confirmation", "independent-review"]
+until  = "2026-12-31"
+```
+
+| Check | What it requires |
+| --- | --- |
+| `plan-confirmation` | The agent stops after the plan until you confirm it |
+| `independent-review` | Two-stage review by the reviewer subagent in a fresh context, result on the MR |
+| `code-owner` | One of the area's `owners` approves the MR |
+| `checklist:<text>` | A person ticks that item in the MR |
+
+Risk is checked three times — the ticket's area when it starts, the planned files, the changed files — and the list
+**only grows**. Files of a high-risk ticket that match no area are reported as **profile gaps**: add them to the profile
+when they belong. Paths use `*` (within a folder) and `**` (any depth), relative to the repository root; an area can
+have no paths yet and still be picked on tickets.
+
+- `avflow risk check` — validates the profile and lists its areas; warns when CODEOWNERS or the CI copy is out of date,
+  or when a newer stack preset adds paths.
+- `avflow risk files <paths…> [--area "<name>"]` — shows which areas and checks apply, before you merge a profile change.
+- `avflow risk sync` — regenerates the avflow block of CODEOWNERS from the areas' `owners` (lines outside the block are
+  kept) and refreshes `ci/avflow_risk.py`. Commit the result in a merge request.
+- `avflow risk suggest [--days 30]` — read-only: collects the profile gaps of recently reviewed tickets and proposes
+  paths per area. A person decides and changes the profile by merge request.
+
+### The CI gate
+
+`avflow init` adds the job **`avflow-risk-check`** to every merge request pipeline. It works out the required checks
+from facts the merge request cannot change — the profile **on the target branch**, the changed files, and the ticket in
+the title (its risk area; the checks recorded at start and plan, when the Redmine CI account may view private notes) —
+and verifies each one:
+
+| Check | Done when |
+| --- | --- |
+| `independent-review` | An MR note starting `### avflow — independent review` contains `Verdict: approve` |
+| `code-owner` | One of the area's owners (a user, or a member of an owner group) approved the MR |
+| `checklist:<text>` | The item is ticked in the avflow section of the MR description |
+| `plan-confirmation` | Happens in the session; listed, not checkable in CI |
+
+`[ci] gate = "report"` (the default during the pilot) only lists what is missing; `gate = "fail"` fails the job, and
+with *Pipelines must succeed* the merge is blocked. The job reads approvals, notes and the description through the
+GitLab API with **`AVFLOW_GITLAB_TOKEN`** (below); without it, those checks show as not verifiable. Works on GitLab Free
+and Premium; on Premium you can also turn on *Require approval from code owners*.
+
+Limits to know: the review note and the ticks cannot prove who wrote them (the human reviewer still looks), and a profile
+change in a merge request applies only after it is merged.
 
 ## Writing tickets avflow can work with
 
-The agent cannot ask questions the way a person does, so a ticket must hold everything it needs. Write team tickets in the team structure — Context, Scope (in and **out**), Acceptance criteria, Constraints, Technical notes, Test approach, Dependencies, Size and mode — or ask the agent to draft one: *"Use the ticket-writer skill to draft a ticket for: …"*. The agent only drafts; you create or edit the ticket and move it to Ready.
+The agent cannot ask questions the way a person does, so a ticket must hold everything it needs. Write team tickets in the team structure — Context, Scope (in and **out**), Acceptance criteria, Constraints, Technical notes, Test approach, Dependencies, Size and mode (estimate, risk area, hotspot) — or ask the agent to draft one: *"Use the ticket-writer skill to draft a ticket for: …"*. The agent only drafts; you create or edit the ticket and move it to Ready.
 
 **Keep the last line machine-readable**, because avflow reads it when Redmine has no custom fields:
 
 ```text
-Estimate: 1–2 h · Proposed mode: (agent proposes) · Machine-side: yes|no · Hotspot: <file or area>|none
+Estimate: 1–2 h · Risk area: <area>|Other high risk|None · Hotspot: <file or area>|none
 ```
+
+The risk area is a name from the project's `.avflow/project.toml` (several: separate them with commas). An investigation
+without production code is a **spike**: use the *Spike* tracker, or add `Type: spike` to the line. On older
+tickets, a proposed mode and a 2.x *Machine-side* field or line are ignored: set the **Risk area** instead.
 
 For a **hard** dependency (the work cannot start), add the Redmine relation **Blocked by**; avflow refuses to start the ticket until the blocking one is done. For a soft one, use **Related to**.
 
@@ -145,7 +212,7 @@ These commands are the same on macOS and Windows.
 | Update (also brings new team settings) | `avflow update` | When the PM announces a new release |
 | Switch workflow for yourself (Superpowers ↔ Matt Pocock) | `avflow setup --advanced`, choose the other workflow | Only when the PM agrees |
 
-**`avflow update`** downloads the new release from GitHub, installs it, updates the Claude Code plugin, and runs `check`. Then **start a new Claude Code session** to load the new skills.
+**`avflow update`** downloads the new release from GitHub, installs it, updates the Claude Code plugin, and runs `check`. Then **start a new Claude Code session** to load the new skills. If `check` then reports a role subagent as *edited by hand*, the release changed the subagents (3.0 did): run `avflow setup` once to regenerate them.
 
 **When the workflow changes** — for the team in a new release, or for you with `--advanced` — setup removes the old one before installing the new one; your token, the MCP server and the team skills stay as they are. Never install both: `check` reports an error if it finds both.
 
@@ -189,11 +256,11 @@ Planning and review benefit from the strongest model; implementing a confirmed p
 
 | Subagent | Does | Default model | Can it change files? |
 | --- | --- | --- | --- |
-| `avflow-planner` | Design and plan for PLAN and FULL tickets | Opus | No — read-only |
+| `avflow-planner` | Design and plan for larger tickets and any ticket in a risk area | Opus | No — read-only |
 | `avflow-implementer` | Implements the confirmed plan, tests first | Sonnet | Yes, only the files in the plan |
-| `avflow-reviewer` | Two-stage review (spec, then code quality) for FULL tickets | Opus | No — reads and runs tests only |
+| `avflow-reviewer` | Two-stage review (spec, then code quality) when `independent-review` is required | Opus | No — reads and runs tests only |
 
-The main session — the model you pick with `/model` in Claude Code — coordinates: it hands each step to the right subagent, posts the results on the ticket and asks you to confirm. DIRECT tickets are usually done in the main session.
+The main session — the model you pick with `/model` in Claude Code — coordinates: it hands each step to the right subagent, posts the results on the ticket and asks you to confirm. Small changes are usually done in the main session.
 
 **The models are team settings** (default Opus to plan and review, Sonnet to implement). To use other models yourself, run `avflow setup --advanced` or edit `[models]` with `avflow config --edit` and then run `avflow setup`. Allowed values: `opus`, `sonnet`, `haiku`, or `inherit` (same as the main session). `avflow check` shows each subagent with its model and reports any that differ from the configuration.
 
@@ -224,14 +291,13 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 | Skill | What it does | Used when |
 | --- | --- | --- |
 | `tickets` | The ticket workflow through the `avflow-tickets` tools: find ready tickets, read them, private notes, start, wait for a green pipeline, submit for review, bug drafts, handoff | Every ticket, from `/avflow:next-ticket` to the handoff |
-| `choose-mode` | Proposes DIRECT, PLAN, FULL or SPIKE from the ticket's risk — machine-side or sensitive paths always mean FULL | Before any work on a ticket |
-| `workflow` | What each mode requires, which subagent does each step, and which skill meets each requirement with Superpowers or Matt Pocock's skills | Once the mode is confirmed, and whenever the agent is unsure which skill to use |
-| `qa-agent` | QA without a dedicated tester: test cases from the acceptance criteria before coding, break-it review, bug reproduction, release checklist, and the two-stage review of FULL tickets (handed to the reviewer subagent) | Before coding, at review, and when a bug is reported |
-| `ticket-writer` | Drafts a ticket in the team structure, with TODOs where it cannot know and the machine-readable *Size and mode* line | Writing a new ticket, or turning a customer ticket into a work ticket |
+| `workflow` | The one ticket flow, how to satisfy each required check, which subagent does each step, and which skill meets each requirement with Superpowers or Matt Pocock's skills | Once a ticket is started, and whenever the agent is unsure which skill to use |
+| `qa-agent` | QA without a dedicated tester: test cases from the acceptance criteria before coding, break-it review, bug reproduction, release checklist, and the two-stage review for `independent-review` (handed to the reviewer subagent) | Before coding, at review, and when a bug is reported |
+| `ticket-writer` | Drafts a ticket in the team structure, with TODOs where it cannot know and the machine-readable *Size and mode* line (estimate, risk area, hotspot) | Writing a new ticket, or turning a customer ticket into a work ticket |
 | `triage` | Classifies a customer ticket (defect S1–S3, change request, question, maintenance), checks the code, tries to reproduce, lists what is missing — never answers the customer | A ticket arrives from the customer |
-| `incident` | Field incidents: severity, the exact logs to request (one site visit), timeline, evidence-based hypotheses, reproduction, fix with a regression test, blameless review | Software misbehaves at a customer site |
+| `incident` | Field incidents: severity, the exact evidence to request (collected once), timeline, evidence-based hypotheses, reproduction, fix with a regression test, blameless review | Software misbehaves at a customer site |
 | `release` | Release notes from the merged tickets (with `avflow release-notes`), the customer engineer's acceptance checklist, pre-release checks, rollback | Preparing a release candidate or a production release |
-| `zoom-out` | Maps the code before changing it — entry points, callers, data, threads, tests, risks — without editing anything | Legacy or unfamiliar code, sensitive paths, after two failed fix attempts |
+| `zoom-out` | Maps the code before changing it — entry points, callers, data, threads, tests, risks — without editing anything | Legacy or unfamiliar code, the paths of a risk area, after two failed fix attempts |
 | `glossary` | Keeps `docs/CONTEXT.md` sharp: one term per concept, conflicts resolved, terms to avoid | A domain term is new, unclear or used with two meanings |
 | `adr` | Records a decision in `docs/adr/` when it is hard to reverse, surprising without context, and a real trade-off | An architectural or scope decision is made |
 
@@ -239,7 +305,7 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 
 | Subagent | What it does | Default model |
 | --- | --- | --- |
-| `avflow-planner` | Designs and plans PLAN and FULL tickets; read-only | Opus |
+| `avflow-planner` | Designs and plans larger or risky tickets; read-only | Opus |
 | `avflow-implementer` | Implements the confirmed plan, tests first, only the files in the plan | Sonnet |
 | `avflow-reviewer` | Independent two-stage review in a fresh context; reads and runs tests only | Opus |
 
@@ -250,6 +316,15 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 | **Superpowers** *or* **Matt Pocock's skills** (team setting) | The coding workflow: design, planning, implementation, tests first, debugging — mapped to the team's requirements by the `workflow` skill |
 | `handoff` (Matt Pocock, pinned) | The session handoff note, posted as a private note on the ticket |
 
+**Project skills (in the project's repository)**
+
+The team skills use generic words — *risk area*, *test environment*, *the customer's environment* — because avflow
+serves many projects. What only one project knows lives in that project: its risk areas in `.avflow/project.toml`, its
+test environments and languages in the *Test environments and languages* section of its `CLAUDE.md`, and its own skills
+in `.claude/skills/<project>-…/` (for example `<project>-hardware-review` for checks on test hardware, or
+`<project>-logs` for the field evidence to request). The team skills read that section and use a project skill when one
+exists.
+
 `triage` is adapted from Matt Pocock's skill of the same name, and `glossary` and `adr` from his `domain-modeling` skill (MIT): the team versions never write anything the customer can read and use the team's files.
 
 ## Starting a new project
@@ -257,19 +332,35 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 In the new repository, run:
 
 ```bash
-avflow init
+avflow init                      # detects the stack; or: avflow init --stack dotnet,node
 ```
 
-It adds the team's standard files: `CLAUDE.md`, `docs/CONTEXT.md`, a first ADR, `CODEOWNERS`, the merge request template, `.gitattributes`, `.editorconfig`, and the GitLab CI jobs that scan the commits for secrets (gitleaks, the server-side backup of the guardrails), check `Refs #id` in merge request titles, and move merged tickets to *Ready for test*. Existing files are never overwritten (use `--force` to replace them); if the project already has a `.gitlab-ci.yml`, avflow tells you to add `include: - local: .gitlab-ci.avflow.yml` to it.
+It writes **`.avflow/project.toml`**, the project's risk profile, from **stack presets** (.NET, Node, Python, Java, Go —
+detected from `*.sln`, `package.json`, `pyproject.toml`, `pom.xml`, `go.mod`, …): areas for dependencies, data migrations,
+configuration, build and CI (including the profile itself and CODEOWNERS) and infrastructure; the stack's own risks as
+commented suggestions; a commented example for a domain area; `[risk.other]`; a strict default — plan confirmation and
+independent review for every change outside the areas — for the first **6 weeks**; and `[ci] gate = "report"`. The
+project owns this file: edit it, add its own areas (payments, machine control, …) and owners.
 
-Then fill in the TODOs in `CLAUDE.md` (build and test commands, sensitive paths) and `CODEOWNERS`, protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
+It also adds the team's standard files: `CLAUDE.md`, `docs/CONTEXT.md`, a first ADR, `CODEOWNERS`, the merge request template, `.gitattributes`, `.editorconfig`, and the GitLab CI jobs that scan the commits for secrets (gitleaks, the server-side backup of the guardrails), check `Refs #id` in merge request titles, move merged tickets to *Ready for test*, and check the risk areas' required checks (`avflow-risk-check`, with its
+scripts `ci/avflow_risk_check.py` and `ci/avflow_risk.py`). Existing files are never overwritten (use `--force` to replace them); if the project already has a `.gitlab-ci.yml`, avflow tells you to add `include: - local: .gitlab-ci.avflow.yml` to it.
+
+Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands; test environments, languages and project skills), protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
 
 | Variable | Value |
 | --- | --- |
-| `REDMINE_URL` | The same Redmine address as in `avflow setup` |
-| `REDMINE_CI_API_KEY` | The API key of a **dedicated CI account** in Redmine (masked, protected) |
+| `REDMINE_URL` | The same Redmine address as in `avflow setup` (not protected: it is not a secret, and merge request pipelines need it) |
+| `REDMINE_CI_API_KEY` | The API key of a **dedicated CI account** in Redmine (masked, **protected**) — moves tickets to *Ready for test* after a merge |
+| `REDMINE_READ_API_KEY` | The API key of a **read-only CI account** (masked, **not protected**) — lets `avflow-risk-check` read the ticket in merge request pipelines. Its role has only *View issues* and *View private notes* |
+| `AVFLOW_GITLAB_TOKEN` | A **project access token** (Settings → Access tokens; role Reporter, scope `read_api`; masked) — lets `avflow-risk-check` read approvals, notes and the description |
 
 **The CI account** is an ordinary Redmine user created only for CI (for example `ci-bot`), member of the project with the team role. Its notes show as written by CI, its key can be reset without affecting anyone, and CI keeps working when people change. Do not use a person's key in a real project: anyone with Maintainer access in GitLab can read CI variables. If there is no CI account yet, remove the `avflow-ready-for-test` job and move tickets to *Ready for test* by hand.
+
+**The read-only account** (for example `ci-reader`) exists because merge request pipelines run on unprotected
+branches: anyone who can push a branch — a person or an agent — could change the CI file and read every variable that
+pipeline gets. So the key with write rights stays protected, and the merge request pipeline gets a key that can only
+read. Without `REDMINE_READ_API_KEY`, `avflow-risk-check` cannot read the ticket and judges by the changed files only
+(it says so in its log); the risk areas named on the ticket are still enforced when the agent starts and plans.
 
 ## For the PM
 
@@ -277,10 +368,28 @@ Two read-only commands turn tickets and merge requests into the documents a PM n
 
 | Command | Produces |
 | --- | --- |
-| `avflow release-notes --from <previous-tag> [--to <commit>] [--out notes.md]` | Release notes from the tickets referenced by the commits, machine-side tickets first, an acceptance checklist skeleton, and warnings for commits without a ticket or tickets not yet *Ready for test* |
-| `avflow report --project <identifier> [--days 7] [--out report.md]` | Weekly report: progress per release, tickets over estimate by more than 50%, tickets reopened in the period, and — when run inside the repository with `glab` signed in — merged merge requests, median time to merge and first-pipeline success |
+| `avflow release-notes --from <previous-tag> [--to <commit>] [--out notes.md]` | Release notes from the tickets referenced by the commits, high-risk tickets first and marked with their risk areas (for example **[Machine control]**), an acceptance checklist skeleton, and warnings for commits without a ticket or tickets not yet *Ready for test* |
+| `avflow report --project <identifier> [--days 7] [--out report.md]` | Weekly report: progress per release, tickets over estimate by more than 50%, tickets reopened in the period, the **risk** of the changes reviewed in the period (share of high-risk changes, tickets per risk area and where the area was found — ticket, plan or only at review — and profile gaps), and — when run inside the repository with `glab` signed in — merged merge requests, median time to merge and first-pipeline success |
 
 Set a default project once with `avflow config --edit` (`project` under `[tickets]`).
+
+The risk section reads the private notes avflow writes at start, plan and review, so it covers the tickets that reached
+`review_requirements` in the period. Areas found **only at review** mean the ticket and the plan missed a risk: improve
+the ticket or the plan habit. **Profile gaps** mean the profile is incomplete: run `avflow risk suggest` and add paths.
+After the pilot, these numbers decide whether `gate = "fail"` becomes the default.
+
+### Moving a project from 2.x to 3.0
+
+1. Members: `avflow update`, then `avflow setup` once (new subagents), and a new Claude Code session.
+2. In each project, on a feature branch: `avflow init` (adds `.avflow/project.toml`, the `avflow-risk-check` job and its
+   scripts; existing files are kept). Add the project's own areas, owners and checks; move the sensitive paths that
+   2.x listed in `CLAUDE.md` / `CODEOWNERS` into areas; fill in the *Test environments and languages* section of
+   `CLAUDE.md` (copy it from the template if the project's `CLAUDE.md` is older); `avflow risk check`, `avflow risk sync`;
+   merge.
+3. Move what the 2.x skills said about this project into its own skills (`.claude/skills/<project>-…/`); the sample
+   project's `sandbox-machine-review` shows the shape.
+4. Open tickets: the Mode field is ignored. A 2.x *Machine-side* field or line is **not** read any more — give every
+   open ticket that had *Machine-side = yes* the matching **Risk area** (or *Other high risk*) before it is started.
 
 ### Changing the team settings
 
@@ -313,7 +422,8 @@ Superpowers is kept; remove it in Claude Code with `/plugin uninstall superpower
 | `avflow update --check` | Only tells you whether a new version exists |
 | `avflow config` | Shows the settings and which are yours (never the token); `--edit`, `--path`, `--reset` |
 | `avflow usage` | Context size per session and subagent calls with their models |
-| `avflow init` | Adds the team's standard files to a project repository |
+| `avflow init [--stack …]` | Adds the team's standard files and the risk profile to a project repository |
+| `avflow risk check` · `files` · `sync` · `suggest` | The project's risk profile: validate, try on files, regenerate CODEOWNERS and the CI copy, propose paths from gaps |
 | `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the referenced tickets |
 | `avflow report --project <id>` | Weekly PM report (read-only) |
 | `avflow uninstall` | Removes configuration, token, MCP server, plugin, skills, subagents and hooks |
