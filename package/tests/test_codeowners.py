@@ -4,7 +4,7 @@ from avflow import cli, risk
 PROFILE = """
 [[risk.area]]
 name   = "Machine control"
-paths  = ["source/Zmotion/**", "**/NativeMethods*.cs"]
+paths  = ["source/Motion/**", "**/NativeMethods*.cs"]
 owners = ["@q", "@lead"]
 checks = ["code-owner"]
 
@@ -25,7 +25,7 @@ def test_block_lists_areas_with_paths_and_owners():
     block = risk.codeowners_block(risk.parse(PROFILE))
     lines = block.splitlines()
     assert lines[0].startswith(risk.CODEOWNERS_BEGIN) and lines[-1] == risk.CODEOWNERS_END
-    assert "/source/Zmotion/** @q @lead" in lines and "**/NativeMethods*.cs @q @lead" in lines
+    assert "/source/Motion/** @q @lead" in lines and "**/NativeMethods*.cs @q @lead" in lines
     assert not any("csproj" in l and not l.startswith("#") for l in lines)      # no owners → not listed
     assert any("Payments" in l and "no paths" in l for l in lines)
 
@@ -53,7 +53,7 @@ def test_risk_sync_writes_codeowners_and_ci_copy(tmp_path, capsys):
     (tmp_path / ".gitlab" / "CODEOWNERS").write_text("/docs/ @writer\n")     # GitLab also reads it here
     assert cli.main(["risk", "sync", "--path", str(tmp_path)]) == 0
     co = (tmp_path / ".gitlab" / "CODEOWNERS").read_text()
-    assert "/docs/ @writer" in co and "/source/Zmotion/** @q @lead" in co and not (tmp_path / "CODEOWNERS").exists()
+    assert "/docs/ @writer" in co and "/source/Motion/** @q @lead" in co and not (tmp_path / "CODEOWNERS").exists()
     assert risk.ci_copy_current((tmp_path / "ci" / "avflow_risk.py").read_text())
     assert cli.main(["risk", "check", "--path", str(tmp_path)]) == 0
     assert "out of date" not in capsys.readouterr().out

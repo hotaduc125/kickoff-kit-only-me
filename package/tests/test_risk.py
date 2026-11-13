@@ -5,13 +5,13 @@ import pytest
 
 from avflow import risk
 
-MATEO = """
+SAMPLE = """
 [project]
-name = "Mateo_v2"
+name = "Shop_v2"
 
 [[risk.area]]
 name   = "Machine control"
-paths  = ["source/Zmotion/**", "source/MachineModes/**"]
+paths  = ["source/Motion/**", "source/Modes/**"]
 owners = ["@q"]
 checks = ["plan-confirmation", "independent-review", "code-owner",
           "checklist:Tested on the test bench by someone other than the author"]
@@ -32,16 +32,16 @@ checks = ["plan-confirmation", "independent-review"]
 """
 
 
-def prof(text=MATEO):
+def prof(text=SAMPLE):
     return risk.parse(text)
 
 
 # ---------- glob matching
 @pytest.mark.parametrize("pattern,path,hit", [
-    ("source/Zmotion/**", "source/Zmotion/ZCommand.cs", True),
-    ("source/Zmotion/**", "source/Zmotion/sub/deep/A.cs", True),
-    ("source/Zmotion/**", "source/ZmotionX/A.cs", False),
-    ("source/Zmotion/**", "other/source/Zmotion/A.cs", False),
+    ("source/Motion/**", "source/Motion/MotionCommand.cs", True),
+    ("source/Motion/**", "source/Motion/sub/deep/A.cs", True),
+    ("source/Motion/**", "source/MotionX/A.cs", False),
+    ("source/Motion/**", "other/source/Motion/A.cs", False),
     (".gitlab-ci.yml", ".gitlab-ci.yml", True),
     (".gitlab-ci.yml", "sub/.gitlab-ci.yml", False),
     ("**/*.csproj", "App.csproj", True),
@@ -60,8 +60,8 @@ def test_glob(pattern, path, hit):
 
 
 def test_windows_and_dot_paths_normalised():
-    assert risk.glob_match("source/Zmotion/**", "source\\Zmotion\\A.cs")
-    assert risk.glob_match("source/Zmotion/**", "./source/Zmotion/A.cs")
+    assert risk.glob_match("source/Motion/**", "source\\Motion\\A.cs")
+    assert risk.glob_match("source/Motion/**", "./source/Motion/A.cs")
 
 
 # ---------- validation
@@ -107,8 +107,8 @@ def test_load_missing_file_returns_none(tmp_path):
 
 def test_load_reads_profile(tmp_path):
     (tmp_path / ".avflow").mkdir()
-    (tmp_path / ".avflow" / "project.toml").write_text(MATEO, encoding="utf-8")
-    assert risk.load(tmp_path).name == "Mateo_v2"
+    (tmp_path / ".avflow" / "project.toml").write_text(SAMPLE, encoding="utf-8")
+    assert risk.load(tmp_path).name == "Shop_v2"
 
 
 # ---------- requirements
@@ -129,10 +129,10 @@ def test_area_name_matching_is_loose():
 
 
 def test_files_match_areas_and_union_is_ordered():
-    r = risk.requirements(prof(), [], ["build/x.ps1", "source/Zmotion/A.cs"])
+    r = risk.requirements(prof(), [], ["build/x.ps1", "source/Motion/A.cs"])
     assert r.areas == {"Machine control": "files", "Build and CI": "files"}
     assert r.checks[:3] == ["plan-confirmation", "independent-review", "code-owner"] and len(r.checks) == 4
-    assert r.files == {"Machine control": ["source/Zmotion/A.cs"], "Build and CI": ["build/x.ps1"]}
+    assert r.files == {"Machine control": ["source/Motion/A.cs"], "Build and CI": ["build/x.ps1"]}
 
 
 def test_area_without_paths_only_from_ticket():
@@ -164,7 +164,7 @@ def test_none_is_ignored():
 
 
 def test_default_applies_only_when_nothing_matches_and_before_until():
-    p = risk.parse(MATEO + '\n[risk.default]\nchecks = ["plan-confirmation"]\nuntil = "2026-12-31"')
+    p = risk.parse(SAMPLE + '\n[risk.default]\nchecks = ["plan-confirmation"]\nuntil = "2026-12-31"')
     assert risk.requirements(p, [], ["src/a.cs"], today=date(2026, 12, 31)).checks == ["plan-confirmation"]
     assert risk.requirements(p, [], ["src/a.cs"], today=date(2027, 1, 1)).checks == []
     hit = risk.requirements(p, [], ["build/a"], today=date(2026, 12, 1))
@@ -177,9 +177,9 @@ def test_default_without_until_is_permanent():
 
 
 def test_profile_gaps_are_files_of_a_high_risk_ticket_outside_every_area():
-    r = risk.requirements(prof(), ["Machine control"], ["source/Zmotion/A.cs", "source/Helpers/Timer.cs"])
+    r = risk.requirements(prof(), ["Machine control"], ["source/Motion/A.cs", "source/Helpers/Timer.cs"])
     assert r.gaps == ["source/Helpers/Timer.cs"]
-    assert risk.requirements(prof(), [], ["source/Zmotion/A.cs", "x.cs"]).gaps == []   # ticket not flagged
+    assert risk.requirements(prof(), [], ["source/Motion/A.cs", "x.cs"]).gaps == []   # ticket not flagged
 
 
 def test_grow_only_adds_and_keeps_order():

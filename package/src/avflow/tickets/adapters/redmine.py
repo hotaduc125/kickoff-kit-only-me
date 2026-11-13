@@ -68,9 +68,9 @@ class RedmineAdapter:
             raise AdapterError(f"Custom field '{name}' is not enabled for ticket #{issue['id']} (project/tracker).")
         return f["id"]
 
-    # ---------- Risk area / Hotspot (and Machine-side during the 3.0 transition)
-    # Preferred: Redmine custom fields (created by an admin). Without them (no admin rights), avflow reads the risk area,
-    # Machine-side and Hotspot from the "Size and mode" line of the description, written by the person. The agent never
+    # ---------- Risk area / Hotspot
+    # Preferred: Redmine custom fields (created by an admin). Without them (no admin rights), avflow reads the risk area
+    # and Hotspot from the "Size and mode" line of the description, written by the person. The agent never
     # writes the description or the risk-area field: it adds a risk area (and sets Hotspot without a field) in private
     # notes starting with MARKER. Risk areas are a union: nothing the agent writes can remove one.
     MARKER = risk.MARKER
@@ -90,18 +90,11 @@ class RedmineAdapter:
     def _fields(self, issue: dict) -> dict:
         cfg = self.cfg
         has_area_cf = self._has_cf(issue, cfg.field_risk_area)
-        has_ms_cf = self._has_cf(issue, cfg.field_machine_side)
         has_hs_cf = self._has_cf(issue, cfg.field_hotspot)
         desc = self._desc_fields(issue.get("description") or "")
         notes = self._marker_fields(issue.get("journals") or [])
         areas = risk.split_areas((self._cf(issue, cfg.field_risk_area) or {}).get("value")) if has_area_cf \
             else list(desc.get("risk_areas", []))
-        if has_ms_cf:
-            ms = (self._cf(issue, cfg.field_machine_side) or {}).get("value") == "1"
-        else:
-            ms = bool(desc.get("machine_side"))
-        if ms or notes.get("machine_side"):
-            areas.append(cfg.machine_side_area or self.OTHER)
         areas += notes["risk_areas"]
         uniq = risk.unique_areas(areas)
         if has_hs_cf:

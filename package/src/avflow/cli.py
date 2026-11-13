@@ -86,14 +86,13 @@ def setup_tickets_redmine(existing: TicketConfig | None) -> TicketConfig:
                     for attr, label in (("status_ready", "Ready"), ("status_in_progress", "In progress"), ("status_in_review", "In review")):
                         while getattr(t, attr) not in available:
                             setattr(t, attr, ask(f"  Status to use for '{label}'", available[0]))
-        print("  ➖ Risk area, Hotspot (and Machine-side during the transition): custom fields are used when they exist;")
+        print("  ➖ Risk area, Hotspot: custom fields are used when they exist;")
         print("     otherwise avflow reads them from the 'Size and mode' line of the ticket description.")
-        if ask("Use the default status and field names (Ready, In progress, In review, Risk area, Machine-side, Hotspot)? y/n", "y").lower() != "y":
+        if ask("Use the default status and field names (Ready, In progress, In review, Risk area, Hotspot)? y/n", "y").lower() != "y":
             t.status_ready = ask("Status: ready", t.status_ready)
             t.status_in_progress = ask("Status: in progress", t.status_in_progress)
             t.status_in_review = ask("Status: in review", t.status_in_review)
             t.field_risk_area = ask("Field: risk area", t.field_risk_area)
-            t.field_machine_side = ask("Field: machine-side", t.field_machine_side)
             t.field_hotspot = ask("Field: hotspot", t.field_hotspot)
         set_secret("redmine", t.url, token)
         ok("API key stored in the OS keyring (not in any file)")
@@ -531,7 +530,7 @@ def cmd_init(args) -> int:
     for f in r["skipped"]:
         print(f"  ➖ kept existing {f}")
     print("\nNext:\n"
-          "  1. .avflow/project.toml: review the risk areas, add the project's own (payments, machine control, …) and\n"
+          "  1. .avflow/project.toml: review the risk areas, add the project's own (payments, authentication, …) and\n"
           "     owners; then `avflow risk check` and `avflow risk sync` (CODEOWNERS).\n"
           "  2. Fill the TODOs in CLAUDE.md; add terms to docs/CONTEXT.md.\n"
           "  3. GitLab CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY, and AVFLOW_GITLAB_TOKEN (project access token,\n"

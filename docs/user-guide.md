@@ -80,7 +80,6 @@ avflow works best when an admin has added the custom fields (Risk area, Hotspot)
 | Statuses | Ready · In progress · In review · Ready for test | The statuses Redmine already has, mapped in the team settings — for Enclave: Ready → **New** · In progress → **In Progress** · In review → **In Code Review** · Ready for test → **Ready for testing** |
 | Risk area, Hotspot | Custom fields (Risk area: a list field) | The **Size and mode** line at the end of the ticket description, written by the person |
 | A risk area the agent adds | — (the agent never writes the field) | A private note starting with `[avflow] risk-area=…`, with the agent's reason |
-| Machine-side (until 3.0 tickets use Risk area) | Custom field | `Machine-side: yes` in the description; read as the risk area **Machine control** (team setting `machine_side_area`) |
 
 avflow uses the custom fields whenever they exist, so nothing changes on the tickets when an admin adds them later — just run `avflow setup` again.
 
@@ -115,11 +114,11 @@ risk area. Each project lists its areas in **`.avflow/project.toml`** (reviewed 
 
 ```toml
 [[risk.area]]
-name   = "Machine control"
-paths  = ["source/Zmotion/**", "source/MachineModes/**"]
-owners = ["@q"]
+name   = "Payments"
+paths  = ["src/billing/**", "src/payments/**"]
+owners = ["@lead"]
 checks = ["plan-confirmation", "independent-review", "code-owner",
-          "checklist:Tested on the test bench by someone other than the author"]
+          "checklist:Tested on the staging system by someone other than the author"]
 
 [risk.other]                 # the ticket's "Other high risk"
 checks = ["plan-confirmation", "independent-review"]
@@ -182,8 +181,8 @@ Estimate: 1–2 h · Risk area: <area>|Other high risk|None · Hotspot: <file or
 ```
 
 The risk area is a name from the project's `.avflow/project.toml` (several: separate them with commas). An investigation
-without production code is a **spike**: use the *Spike* tracker, or add `Type: spike` to the line. Older tickets
-need no edit: `Machine-side: yes` is still read, as the risk area *Machine control*, and a proposed mode is ignored.
+without production code is a **spike**: use the *Spike* tracker, or add `Type: spike` to the line. On older
+tickets, a proposed mode and a 2.x *Machine-side* field or line are ignored: set the **Risk area** instead.
 
 For a **hard** dependency (the work cannot start), add the Redmine relation **Blocked by**; avflow refuses to start the ticket until the blocking one is done. For a soft one, use **Related to**.
 
@@ -322,8 +321,8 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 The team skills use generic words — *risk area*, *test environment*, *the customer's environment* — because avflow
 serves many projects. What only one project knows lives in that project: its risk areas in `.avflow/project.toml`, its
 test environments and languages in the *Test environments and languages* section of its `CLAUDE.md`, and its own skills
-in `.claude/skills/<project>-…/` (for Mateo, for example, `mateo-machine-review` for simulator and test bench checks, and
-`mateo-logs` for the field evidence to request). The team skills read that section and use a project skill when one
+in `.claude/skills/<project>-…/` (for example `<project>-hardware-review` for checks on test hardware, or
+`<project>-logs` for the field evidence to request). The team skills read that section and use a project skill when one
 exists.
 
 `triage` is adapted from Matt Pocock's skill of the same name, and `glossary` and `adr` from his `domain-modeling` skill (MIT): the team versions never write anything the customer can read and use the team's files.
@@ -380,10 +379,10 @@ After the pilot, these numbers decide whether `gate = "fail"` becomes the defaul
    2.x listed in `CLAUDE.md` / `CODEOWNERS` into areas; fill in the *Test environments and languages* section of
    `CLAUDE.md` (copy it from the template if the project's `CLAUDE.md` is older); `avflow risk check`, `avflow risk sync`;
    merge.
-3. Move what the 2.x skills said about this project into its own skills. For Mateo, the drafts are in avflow-dev,
-   `examples/mateo-project-skills/` (the *Machine control* area, the `CLAUDE.md` section, `mateo-machine-review`,
-   `mateo-logs`).
-4. Tickets need no edit: the Mode field is ignored, and `Machine-side: yes` reads as the team's area (`machine_side_area`).
+3. Move what the 2.x skills said about this project into its own skills (`.claude/skills/<project>-…/`); the sample
+   project's `sandbox-machine-review` shows the shape.
+4. Open tickets: the Mode field is ignored. A 2.x *Machine-side* field or line is **not** read any more — give every
+   open ticket that had *Machine-side = yes* the matching **Risk area** (or *Other high risk*) before it is started.
 
 ### Changing the team settings
 

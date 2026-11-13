@@ -4,7 +4,7 @@ from avflow import cli, risk
 PROFILE = """
 [[risk.area]]
 name   = "Machine control"
-paths  = ["source/Zmotion/**"]
+paths  = ["source/Motion/**"]
 checks = ["independent-review"]
 """
 
@@ -25,7 +25,7 @@ def test_gaps_grouped_by_area_and_folder():
 
 
 def test_paths_already_covered_are_dropped():
-    s = risk.suggest_paths([entry(12, {"Machine control": "ticket"}, ["source/Zmotion/new.cs"])], risk.parse(PROFILE))
+    s = risk.suggest_paths([entry(12, {"Machine control": "ticket"}, ["source/Motion/new.cs"])], risk.parse(PROFILE))
     assert s == []
 
 
@@ -39,7 +39,7 @@ class FakeAdapter:
         self.journals = journals
 
     def list_issues(self, **params):
-        assert params["project_id"] == "mateo"
+        assert params["project_id"] == "shop"
         return [{"id": i, "updated_on": "2099-01-01T00:00:00Z"} for i in self.journals]
 
     def issue_raw(self, i, include="journals"):
@@ -52,7 +52,7 @@ def test_cli_reads_private_review_notes_only(tmp_path, capsys, monkeypatch):
     review = risk.required_line("review", {"Machine control": "ticket"}, [], ["source/Helpers/Timer.cs"])
     adapter = FakeAdapter({12: [{"notes": review, "private_notes": True}],
                            13: [{"notes": review.replace("Timer", "Evil"), "private_notes": False}]})
-    cfg = type("C", (), {"tickets": type("T", (), {"project": "mateo"})()})()
+    cfg = type("C", (), {"tickets": type("T", (), {"project": "shop"})()})()
     monkeypatch.setattr(cli, "_ticket_adapter", lambda: (cfg, adapter))
     assert cli.main(["risk", "suggest", "--path", str(tmp_path), "--days", "30"]) == 0
     out = capsys.readouterr().out

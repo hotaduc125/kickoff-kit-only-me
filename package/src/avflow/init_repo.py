@@ -35,8 +35,7 @@ def init_repo(target: Path, project: str | None = None, force: bool = False, cfg
     stacks = risk.detect_stacks(target) if stacks is None else list(stacks)
     profile_text = risk.render_profile(project, stacks, today)          # raises ValueError for an unknown stack
     names = {"{status_in_review}": t.status_in_review, "{status_ready_for_test}": t.status_ready_for_test,
-             "{field_risk_area}": t.field_risk_area, "{field_machine_side}": t.field_machine_side,
-             "{machine_side_area}": t.machine_side_area}
+             "{field_risk_area}": t.field_risk_area}
     result = {"created": [], "skipped": [], "overwritten": [], "stacks": stacks}
     profile_existed = (target / risk.PROFILE).exists()
     for rel, text in template_files():

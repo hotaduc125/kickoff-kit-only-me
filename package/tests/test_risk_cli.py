@@ -4,7 +4,7 @@ from avflow import cli
 PROFILE = """
 [[risk.area]]
 name   = "Machine control"
-paths  = ["source/Zmotion/**"]
+paths  = ["source/Motion/**"]
 owners = ["@q"]
 checks = ["plan-confirmation", "code-owner"]
 
@@ -45,9 +45,9 @@ def test_check_missing_profile(tmp_path, capsys):
 
 def test_files_shows_areas_and_checks(tmp_path, capsys):
     write(tmp_path)
-    assert cli.main(["risk", "files", "source/Zmotion/A.cs", "src/ui.cs", "--path", str(tmp_path)]) == 0
+    assert cli.main(["risk", "files", "source/Motion/A.cs", "src/ui.cs", "--path", str(tmp_path)]) == 0
     out = capsys.readouterr().out
-    assert "Machine control (files)" in out and "source/Zmotion/A.cs" in out and "Code owner approval" in out
+    assert "Machine control (files)" in out and "source/Motion/A.cs" in out and "Code owner approval" in out
 
 
 def test_files_with_ticket_area(tmp_path, capsys):

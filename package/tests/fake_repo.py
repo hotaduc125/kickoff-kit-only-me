@@ -2,10 +2,10 @@
 from avflow import risk
 from avflow.tickets.repo import RepoError
 
-MATEO = """
+SAMPLE = """
 [[risk.area]]
 name   = "Machine control"
-paths  = ["source/Zmotion/**"]
+paths  = ["source/Motion/**"]
 owners = ["@q"]
 checks = ["plan-confirmation", "independent-review", "code-owner", "checklist:Tested on the test bench"]
 
@@ -18,7 +18,7 @@ checks = ["code-owner"]
 
 
 class FakeRepo:
-    def __init__(self, profile=MATEO, files=(), target="develop", post_error=None):
+    def __init__(self, profile=SAMPLE, files=(), target="develop", post_error=None):
         self.profile_text, self.files, self.target, self.post_error = profile, list(files), target, post_error
         self.posted, self.bases, self.description = [], [], ""
 

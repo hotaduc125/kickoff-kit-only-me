@@ -19,7 +19,7 @@ gate = "{gate}"
 
 [[risk.area]]
 name   = "Machine control"
-paths  = ["source/Zmotion/**"]
+paths  = ["source/Motion/**"]
 owners = ["@q", "@leads"]
 checks = ["independent-review", "code-owner", "checklist:Tested on the test bench"]
 
@@ -34,12 +34,11 @@ APPROVE = "### avflow — independent review\nStage 1: OK\n**Verdict:** approve"
 
 
 class World:
-    def __init__(self, gate="report", files=("source/Zmotion/Z.cs",), title="Add pause. Refs #12", profile=True,
+    def __init__(self, gate="report", files=("source/Motion/Z.cs",), title="Add pause. Refs #12", profile=True,
                  token="t", description="", notes=(), approved=(), issue=None, groups=None):
         self.env = {"CI_MERGE_REQUEST_TARGET_BRANCH_NAME": "develop", "CI_MERGE_REQUEST_DIFF_BASE_SHA": "b",
                     "CI_COMMIT_SHA": "h", "CI_MERGE_REQUEST_TITLE": title, "CI_API_V4_URL": API, "CI_PROJECT_ID": "7",
-                    "CI_MERGE_REQUEST_IID": "87", "REDMINE_URL": "https://redmine.test", "REDMINE_CI_API_KEY": "k",
-                    "AVFLOW_MACHINE_SIDE_AREA": "Machine control"}
+                    "CI_MERGE_REQUEST_IID": "87", "REDMINE_URL": "https://redmine.test", "REDMINE_CI_API_KEY": "k"}
         if token:
             self.env["AVFLOW_GITLAB_TOKEN"] = token
         self.profile = PROFILE.format(gate=gate) if profile else None
@@ -140,10 +139,10 @@ def test_ticket_area_counts_without_matching_files():
     assert "Payments (ticket)" in out and "Plan confirmation" in out and "Profile gaps" in out
 
 
-def test_machine_side_field_maps_to_the_team_area():
-    issue = {"custom_fields": [{"name": "Machine-side", "value": "1"}], "description": "", "journals": []}
+def test_risk_area_field_of_the_ticket_counts():
+    issue = {"custom_fields": [{"name": "Risk area", "value": ["Payments"]}], "description": "", "journals": []}
     code, out = World(files=["README.md"], issue=issue).run()
-    assert "Machine control (ticket)" in out
+    assert "Payments (ticket)" in out
 
 
 def test_checks_from_the_plan_stage_stay_required():

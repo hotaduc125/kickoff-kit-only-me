@@ -11,7 +11,7 @@ from avflow.tickets.core import TicketTools, ToolError
 from fake_redmine import FakeRedmine, issue
 from fake_repo import FakeRepo
 
-MR = "https://gitlab.enclave.vn/mateo/app/-/merge_requests/87"
+MR = "https://gitlab.enclave.vn/shop/app/-/merge_requests/87"
 FULL = ["plan-confirmation", "independent-review", "code-owner", "checklist:Tested on the test bench"]
 
 
@@ -45,8 +45,8 @@ def test_plan_without_risky_files_continues_and_posts_the_plan(tmp_path):
 
 def test_plan_naming_a_risky_file_stops_for_confirmation(tmp_path):
     t, fake, _ = make(tmp_path, [issue(1, status="In progress")])
-    r = t.assess_plan(1, "Add a pause command.", ["source/Zmotion/ZCommand.cs", "tests/ZCommandTests.cs"])
-    assert r["decision"] == "stop" and r["matched_areas"] == {"Machine control": ["source/Zmotion/ZCommand.cs"]}
+    r = t.assess_plan(1, "Add a pause command.", ["source/Motion/MotionCommand.cs", "tests/MotionCommandTests.cs"])
+    assert r["decision"] == "stop" and r["matched_areas"] == {"Machine control": ["source/Motion/MotionCommand.cs"]}
     assert r["added_checks"] == FULL and "confirm" in r["next"]
     assert "STOP" in last_note(fake)["notes"]
 
@@ -81,7 +81,7 @@ def test_plan_needs_my_ticket_in_progress(tmp_path, kw):
 
 # ---------- review_requirements
 def test_review_lists_checks_from_the_diff_and_posts_on_mr_and_ticket(tmp_path):
-    t, fake, repo = make(tmp_path, [issue(1, status="In progress")], FakeRepo(files=["source/Zmotion/Z.cs", "README.md"]))
+    t, fake, repo = make(tmp_path, [issue(1, status="In progress")], FakeRepo(files=["source/Motion/Z.cs", "README.md"]))
     r = t.review_requirements(1, MR)
     assert r["required_checks"] == FULL and r["risk_areas"] == {"Machine control": "review"}
     assert r["missed_at_plan"] == ["Machine control"] and r["mr_note"] == "posted"
@@ -95,13 +95,13 @@ def test_review_lists_checks_from_the_diff_and_posts_on_mr_and_ticket(tmp_path):
 def test_checks_required_at_plan_stay_at_review(tmp_path):
     repo = FakeRepo(files=["source/Views/OrderWindow.xaml"])
     t, _, _ = make(tmp_path, [issue(1, status="In progress")], repo)
-    t.assess_plan(1, "Plan", ["source/Zmotion/ZCommand.cs"])
+    t.assess_plan(1, "Plan", ["source/Motion/MotionCommand.cs"])
     r = t.review_requirements(1, MR)
     assert r["required_checks"] == FULL and r["added_at_review"] == [] and r["missed_at_plan"] == []
 
 
 def test_profile_gaps_for_a_high_risk_ticket(tmp_path):
-    repo = FakeRepo(files=["source/Zmotion/Z.cs", "source/Helpers/Timer.cs"])
+    repo = FakeRepo(files=["source/Motion/Z.cs", "source/Helpers/Timer.cs"])
     t, _, _ = make(tmp_path, [issue(1, risk="Machine control")], repo)
     t.start_ticket(1)
     r = t.review_requirements(1, MR)
@@ -165,7 +165,7 @@ def test_public_marker_cannot_lower_or_fake_checks(tmp_path):
 
 
 def test_submit_returns_the_required_checks(tmp_path):
-    t, _, _ = make(tmp_path, [issue(1, status="In progress")], FakeRepo(files=["source/Zmotion/Z.cs"]))
+    t, _, _ = make(tmp_path, [issue(1, status="In progress")], FakeRepo(files=["source/Motion/Z.cs"]))
     t.review_requirements(1, MR)
     assert t.submit_for_review(1, MR)["required_checks"] == FULL
 
@@ -183,7 +183,7 @@ def test_reason_cannot_smuggle_a_marker_line(tmp_path):
 
 
 def test_review_writes_the_checklist_into_the_mr_and_keeps_ticks(tmp_path):
-    repo = FakeRepo(files=["source/Zmotion/Z.cs"])
+    repo = FakeRepo(files=["source/Motion/Z.cs"])
     repo.description = "## What and why\nRefs #1"
     t, _, _ = make(tmp_path, [issue(1, status="In progress")], repo)
     r = t.review_requirements(1, MR)

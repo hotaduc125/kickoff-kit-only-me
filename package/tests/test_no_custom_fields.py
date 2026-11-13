@@ -10,13 +10,13 @@ from avflow.tickets.core import TicketTools, ToolError
 from fake_redmine import FakeRedmine, issue
 from fake_repo import FakeRepo
 
-SIZE = "## Size and mode\nEstimate: 1–2 h · Machine-side: {ms} · Hotspot: {hs}\n"
+SIZE = "## Size and mode\nEstimate: 1–2 h · Hotspot: {hs}\n"
 
 
-def plain(i, status="Ready", assigned=10, ms="no", hs="none", extra=""):
+def plain(i, status="Ready", assigned=10, hs="none", extra=""):
     t = issue(i, status=status, assigned=assigned)
     t["custom_fields"] = []                       # no custom fields in this Redmine
-    t["description"] = "## Context\nSomething.\n\n" + SIZE.format(ms=ms, hs=hs) + extra
+    t["description"] = "## Context\nSomething.\n\n" + SIZE.format(hs=hs) + extra
     return t
 
 
@@ -28,11 +28,11 @@ def make(tmp_path, issues, **cfg_kw):
 
 
 @pytest.mark.parametrize("text,expected", [
-    ("Machine-side: yes · Hotspot: src/Settings.cs", {"machine_side": True, "hotspot": "src/Settings.cs"}),
-    ("**Machine-side:** no · **Hotspot:** none", {"machine_side": False, "hotspot": None}),
-    ("machine side: YES | hotspot: `ZCommand.cs`", {"machine_side": True, "hotspot": "ZCommand.cs"}),
+    ("Estimate: 2 h · Hotspot: src/Settings.cs", {"hotspot": "src/Settings.cs"}),
+    ("**Hotspot:** none", {"hotspot": None}),
+    ("hotspot: `Billing.cs`", {"hotspot": "Billing.cs"}),
     ("Hotspot: TODO before Ready", {"hotspot": None}),
-    ("Estimate: 2 h · Risk area: Machine control · Hotspot: none", {"risk_areas": ["Machine control"]}),
+    ("Estimate: 2 h · Risk area: Payments · Hotspot: none", {"risk_areas": ["Payments"]}),
     ("**Risk area:** Payments, Auth", {"risk_areas": ["Payments", "Auth"]}),
     ("Risk area: None", {"risk_areas": []}),
     ("High risk: yes", {"risk_areas": ["Other high risk"]}),
@@ -47,17 +47,16 @@ def test_description_parsing(text, expected):
 
 
 def test_fields_from_description(tmp_path):
-    t, _ = make(tmp_path, [plain(1, ms="no", hs="src/Settings.cs", extra="Risk area: Build and CI\n")])
+    t, _ = make(tmp_path, [plain(1, hs="src/Settings.cs", extra="Risk area: Build and CI\n")])
     f = t.get_ticket(1)["fields"]
     assert f["risk_areas"] == ["Build and CI"] and f["hotspot"] == "src/Settings.cs" and "mode" not in f
     assert f["source"] == "description and private notes"
 
 
-def test_machine_side_line_maps_to_the_team_area(tmp_path):
-    t, _ = make(tmp_path, [plain(1, ms="yes")], machine_side_area="Machine control")
-    assert t.get_ticket(1)["fields"]["risk_areas"] == ["Machine control"]
-    t2, _ = make(tmp_path, [plain(1, ms="yes")])
-    assert t2.get_ticket(1)["fields"]["risk_areas"] == ["Other high risk"]
+def test_old_machine_side_line_is_not_a_risk_area(tmp_path):
+    """2.x tickets may still say 'Machine-side: yes'; since 3.0 only the risk area counts."""
+    t, _ = make(tmp_path, [plain(1, extra="Machine-side: yes\n")])
+    assert t.get_ticket(1)["fields"]["risk_areas"] == []
 
 
 def test_start_works_without_any_mode(tmp_path):
@@ -71,12 +70,12 @@ def test_old_mode_notes_are_ignored(tmp_path):
     x["journals"] = [{"notes": "[avflow] mode=full · machine-side=yes", "private_notes": True}]
     t, _ = make(tmp_path, [x])
     f = t.get_ticket(1)["fields"]
-    assert "mode" not in f and f["risk_areas"] == ["Other high risk"]       # a 2.x raise of Machine-side still counts
+    assert "mode" not in f and f["risk_areas"] == []
 
 
 def test_agent_adds_area_in_a_private_note_never_in_the_description(tmp_path):
     t, fake = make(tmp_path, [plain(1, extra="Risk area: Build and CI\n")])
-    t.set_fields(1, risk_area="Machine control", reason="plan touches ZCommand")
+    t.set_fields(1, risk_area="Machine control", reason="plan touches MotionCommand")
     assert not [c for c in fake.calls if c[0] == "PUT" and "description" in (c[3] or {}).get("issue", {})]
     assert t.get_ticket(1)["fields"]["risk_areas"] == ["Build and CI", "Machine control"]
 

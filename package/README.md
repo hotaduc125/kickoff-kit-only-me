@@ -102,8 +102,8 @@ Required checks are computed from facts — the ticket's risk area, the planned 
 project's `.avflow/project.toml`, and only ever grow. See `docs/design/avflow-3.0.md`.
 
 ## Ticket system setup (Redmine)
-Best: REST API enabled; statuses Ready, In progress, In review, Ready for test; custom fields Risk area (list), Hotspot (text)
-(Machine-side (boolean) is still read during the transition); tracker Bug; the customer role must not view private notes.
+Best: REST API enabled; statuses Ready, In progress, In review, Ready for test; custom fields Risk area (list), Hotspot (text);
+tracker Bug; the customer role must not view private notes.
 
 Without admin rights: setup maps the workflow onto Redmine's default statuses, and avflow reads the risk area and Hotspot
 from the "Size and mode" line of the description (`Risk area: …`); a risk area the agent adds is kept in a private

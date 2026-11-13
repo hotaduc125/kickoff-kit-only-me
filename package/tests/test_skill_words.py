@@ -43,3 +43,26 @@ def test_no_project_words(path):
             line = text.count("\n", 0, m.start()) + 1
             hits.append(f"line {line}: {what!r} ({m.group(0)!r})")
     assert not hits, "\n".join(hits)
+
+
+# Everything avflow ships (code, templates, defaults, the team file, scripts, docs for members) names no project or
+# customer and carries no project concept such as Machine-side: avflow serves any project.
+SHIPPED = sorted(p for base in ("package/src/avflow", "plugin", "team", "scripts", "examples/avflow-sandbox")
+                 for p in (ROOT / base).rglob("*")
+                 if p.is_file() and p.suffix in (".py", ".md", ".toml", ".yml", ".json", ".sh", ".ps1", "")
+                 and not any(part.startswith(".") and part != ".claude" for part in p.relative_to(ROOT).parts)
+                 and "__pycache__" not in p.parts)
+SHIPPED += [ROOT / f for f in ("INSTALL.md", "package/README.md", "plugin/README.md", "docs/user-guide.md")]
+PROJECT_CONCEPTS = r"\b(mateo|wkkm|zmotion)\b|machine[-_ ]side_area|field_machine_side|MACHINE_SIDE"
+
+
+def test_shipped_files_found():
+    assert len(SHIPPED) >= 60
+
+
+@pytest.mark.parametrize("path", SHIPPED, ids=lambda p: str(p.relative_to(ROOT)))
+def test_no_project_or_customer_names(path):
+    text = path.read_text(encoding="utf-8", errors="replace")
+    hits = [f"line {text.count(chr(10), 0, m.start()) + 1}: {m.group(0)!r}"
+            for m in re.finditer(PROJECT_CONCEPTS, text, re.IGNORECASE)]
+    assert not hits, "\n".join(hits)

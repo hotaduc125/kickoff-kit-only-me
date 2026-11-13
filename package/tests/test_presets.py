@@ -36,7 +36,7 @@ def test_known_stacks():
 
 
 def test_rendered_profile_is_valid_and_has_the_agreed_defaults():
-    text = risk.render_profile("Mateo_v2", ["dotnet"], today=date(2026, 11, 13))
+    text = risk.render_profile("Shop_v2", ["dotnet"], today=date(2026, 11, 13))
     p = risk.parse(text)
     assert p.problems == [], p.problems
     names = [a.name for a in p.areas]

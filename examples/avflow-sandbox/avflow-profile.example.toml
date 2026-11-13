@@ -72,7 +72,7 @@ checks = ["plan-confirmation", "independent-review"]
 # tickets can name the area, and paths are added once the folder structure is decided.
 
 [[risk.area]]
-name   = "Machine control"     # = the team setting machine_side_area: "Machine-side: yes" lands here
+name   = "Machine control"
 paths  = ["src/sandbox/machine.py"]
 owners = ["@colleague"]        # not the MR author: GitLab may forbid approving your own MR (test E9)
 checks = ["plan-confirmation", "independent-review", "code-owner",

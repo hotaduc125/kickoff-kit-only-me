@@ -5,6 +5,23 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
+## avflow is project-neutral: Machine-side removed, no project or customer in avflow (Nov 13, 2026)
+
+- **avflow serves any software project**; no project or customer (Mateo, WKKM, …) may appear in its code, defaults,
+  team file, scripts, skills or member docs. *Why:* the PM's purpose — avflow manages any project with AI agents; one
+  project's concepts in the engine make it harder to adopt for the next. Supersedes the phase 1 decision to map
+  *Machine-side* to an area.
+- **Machine-side is no longer read** — not the custom field, not the `Machine-side:` line, not `machine-side=` in 2.x
+  notes. The settings `field_machine_side` and `machine_side_area` and the CI variables `AVFLOW_FIELD_MACHINE_SIDE` /
+  `AVFLOW_MACHINE_SIDE_AREA` are gone. Old config files still load (unknown keys are ignored). *Consequence:* open 2.x
+  tickets with Machine-side = yes need a **Risk area** before they start; the plan's paths still catch the area
+  (`assess_plan`), so a missed ticket stops at the plan instead of slipping through.
+- **The Mateo drafts left the repository** (moved to `../mateo-avflow-drafts`, next to this repository); they belong in
+  Mateo's own repository. Test data uses neutral names (`Motion`, `Shop_v2`, `shop`).
+- **Guarded by a test:** `tests/test_skill_words.py::test_no_project_or_customer_names` scans everything shipped
+  (package, plugin, team file, scripts, sample project, member docs). Enclave's own settings stay in `team/avflow-team.toml`,
+  which is the place for organisation decisions. Earlier entries below keep their history as written.
+
 ## 3.0 phase 3 — generic words, project skills, report; version 3.0.0 (Nov 13, 2026)
 
 - **Project words are kept out of avflow by a test** (`tests/test_skill_words.py`): skills, commands, subagent templates

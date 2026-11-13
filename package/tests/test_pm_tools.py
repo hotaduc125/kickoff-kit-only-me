@@ -11,13 +11,13 @@ CFG = TicketConfig(url="https://r.test")
 
 # ---------- init
 def test_init_creates_standard_files(tmp_path):
-    r = init_repo(tmp_path, project="Mateo_v2")
+    r = init_repo(tmp_path, project="Shop_v2")
     for f in ("CLAUDE.md", "docs/CONTEXT.md", "docs/adr/0001-record-architecture-decisions.md", "CODEOWNERS",
               ".gitattributes", ".editorconfig", ".gitlab/merge_request_templates/Default.md",
               ".gitlab-ci.avflow.yml", "ci/avflow_redmine_update.py", ".gitlab-ci.yml"):
         assert (tmp_path / f).exists(), f
     text = (tmp_path / "CLAUDE.md").read_text()
-    assert "# Mateo_v2" in text and "{project}" not in text
+    assert "# Shop_v2" in text and "{project}" not in text
     assert "{date}" not in (tmp_path / "docs/adr/0001-record-architecture-decisions.md").read_text()
     assert "include:" in (tmp_path / ".gitlab-ci.yml").read_text()
     assert len(r["created"]) >= 10
@@ -111,7 +111,7 @@ class FakeAdapter:
 
 
 def test_build_report_end_to_end_without_gitlab():
-    text = report.build_report(FakeAdapter(), CFG, "mateo", 7, runner=lambda c, interactive=False: (1, "glab: not a repo"),
+    text = report.build_report(FakeAdapter(), CFG, "shop", 7, runner=lambda c, interactive=False: (1, "glab: not a repo"),
                                now=datetime(2026, 11, 10, tzinfo=timezone.utc))
     assert "| Release 1 |" in text and "#1 T1 — estimated 4 h, spent 8.0 h" in text and "not available" in text
 
@@ -121,7 +121,7 @@ def test_build_report_with_gitlab():
 
     def runner(cmd, interactive=False):
         return (0, mrs) if "pipelines" not in cmd[-1] else (0, json.dumps([{"status": "success"}]))
-    text = report.build_report(FakeAdapter(), CFG, "mateo", 7, runner=runner, now=datetime(2026, 11, 10, tzinfo=timezone.utc))
+    text = report.build_report(FakeAdapter(), CFG, "shop", 7, runner=runner, now=datetime(2026, 11, 10, tzinfo=timezone.utc))
     assert "Merged: 1" in text and "First pipeline green: 1/1" in text
 
 
@@ -178,7 +178,7 @@ def test_build_report_has_risk_section():
     class A(FakeAdapter):
         def issue_raw(self, i, include=""):
             return {"journals": risk_journals().get(i, [])}
-    text = report.build_report(A(), CFG, "mateo", 7, runner=lambda c, interactive=False: (1, ""),
+    text = report.build_report(A(), CFG, "shop", 7, runner=lambda c, interactive=False: (1, ""),
                                now=datetime(2026, 11, 10, tzinfo=timezone.utc))
     assert "## Risk (2 tickets reviewed in the period)" in text and "Machine control" in text
 
@@ -219,10 +219,10 @@ def test_init_writes_a_profile_from_the_detected_stack(tmp_path):
     from datetime import date
     from avflow import risk
     (tmp_path / "App.sln").write_text("")
-    r = init_repo(tmp_path, project="Mateo_v2", today=date(2026, 11, 13))
+    r = init_repo(tmp_path, project="Shop_v2", today=date(2026, 11, 13))
     assert r["stacks"] == ["dotnet"] and ".avflow/project.toml" in r["created"]
     p = risk.load(tmp_path)
-    assert p.problems == [] and p.name == "Mateo_v2" and p.presets == ["dotnet"] and p.gate == "report"
+    assert p.problems == [] and p.name == "Shop_v2" and p.presets == ["dotnet"] and p.gate == "report"
     co = (tmp_path / "CODEOWNERS").read_text()
     assert risk.codeowners_in_sync(co, p) and "TODO" not in co
     assert risk.ci_copy_current((tmp_path / "ci/avflow_risk.py").read_text())

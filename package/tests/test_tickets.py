@@ -43,8 +43,8 @@ def test_note_limits(tmp_path):
 
 def test_fields(tmp_path):
     t, fake = make(tmp_path, [issue(1)])
-    t.set_fields(1, risk_area="machine control", reason="The plan drives the axis", hotspot="ZCommand.cs")
-    assert {"id": 23, "value": "ZCommand.cs"} in puts(fake)[0][3]["issue"]["custom_fields"]
+    t.set_fields(1, risk_area="machine control", reason="The plan drives the axis", hotspot="MotionCommand.cs")
+    assert {"id": 23, "value": "MotionCommand.cs"} in puts(fake)[0][3]["issue"]["custom_fields"]
     note = fake.issues[1]["journals"][-1]
     assert note["private_notes"] is True and note["notes"].startswith("[avflow] risk-area=Machine_control")
     assert "The plan drives the axis" in note["notes"]
@@ -96,13 +96,8 @@ def test_start_returns_the_ticket_area_checks_and_remembers_them(tmp_path):
     assert note["private_notes"] is True and note["notes"].startswith("[avflow] required {")
 
 
-def test_machine_side_maps_to_the_team_area(tmp_path):
-    t, _ = make(tmp_path, [issue(1, machine="1")], machine_side_area="Machine control")
-    assert t.start_ticket(1)["risk_areas"] == {"Machine control": "ticket"}
-
-
-def test_machine_side_without_mapping_is_other_high_risk(tmp_path):
-    t, _ = make(tmp_path, [issue(1, machine="1")])
+def test_other_high_risk_from_the_ticket(tmp_path):
+    t, _ = make(tmp_path, [issue(1, risk="Other high risk")])
     r = t.start_ticket(1)
     assert r["risk_areas"] == {"Other high risk": "ticket"} and r["required_checks"] == ["plan-confirmation", "independent-review"]
 
@@ -120,8 +115,8 @@ def test_broken_profile_refuses_start(tmp_path):
 
 
 def test_start_ok_and_hotspot_warning(tmp_path):
-    t, fake = make(tmp_path, [issue(1, hotspot="ZCommand.cs"),
-                              issue(2, status="In progress", assigned=11, hotspot="ZCommand.cs")])
+    t, fake = make(tmp_path, [issue(1, hotspot="MotionCommand.cs"),
+                              issue(2, status="In progress", assigned=11, hotspot="MotionCommand.cs")])
     r = t.start_ticket(1)
     assert fake.issues[1]["status"]["name"] == "In progress" and r["warning"]
     assert fake.issues[1]["journals"][-1]["private_notes"] is True

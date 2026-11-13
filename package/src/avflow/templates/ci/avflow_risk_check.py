@@ -90,15 +90,10 @@ def ticket_facts(src: Sources, ids: list[int], notes: list[str]) -> tuple[list[s
         cf = {(f.get("name") or "").lower(): f.get("value") for f in issue.get("custom_fields") or []}
         desc = risk.description_fields(issue.get("description") or "")
         field_area = env.get("AVFLOW_FIELD_RISK_AREA", "Risk area").lower()
-        field_ms = env.get("AVFLOW_FIELD_MACHINE_SIDE", "Machine-side").lower()
         areas += risk.split_areas(cf[field_area]) if field_area in cf else desc.get("risk_areas", [])
-        if (cf.get(field_ms) == "1") if field_ms in cf else desc.get("machine_side"):
-            areas.append(env.get("AVFLOW_MACHINE_SIDE_AREA") or risk.OTHER)
         private += [j.get("notes") or "" for j in issue.get("journals") or [] if j.get("private_notes")]
     marks = risk.marker_fields(private)
     areas += marks["risk_areas"]
-    if marks.get("machine_side"):
-        areas.append(env.get("AVFLOW_MACHINE_SIDE_AREA") or risk.OTHER)
     prior = risk.required_from_notes(private)
     if ids and not private:
         notes.append("No private [avflow] notes visible: checks recorded at start and plan are not known to CI "

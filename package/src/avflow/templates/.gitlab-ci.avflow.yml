@@ -60,8 +60,6 @@ avflow-risk-check:
   variables:                       # the team's ticket field names, written by `avflow init`
     GIT_DEPTH: "0"
     AVFLOW_FIELD_RISK_AREA: "{field_risk_area}"
-    AVFLOW_FIELD_MACHINE_SIDE: "{field_machine_side}"
-    AVFLOW_MACHINE_SIDE_AREA: "{machine_side_area}"
   script:
     - apt-get update -qq && apt-get install -y -qq git > /dev/null
     - python ci/avflow_risk_check.py

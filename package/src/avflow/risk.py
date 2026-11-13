@@ -108,9 +108,6 @@ def description_fields(description: str) -> dict:
     """Values a person wrote in the description's "Size and mode" line."""
     d = description or ""
     out: dict = {}
-    m = re.search(r"(?im)machine[- ]side\s*:\s*\**\s*(yes|no)\b", d)
-    if m:
-        out["machine_side"] = m.group(1).lower() == "yes"
     m = re.search(r"(?im)hotspot\s*:\s*\**\s*`?([^`\n·|*]+?)`?\s*\**\s*(?:[·|]|$)", d)
     if m:
         v = m.group(1).strip()
@@ -127,9 +124,9 @@ def description_fields(description: str) -> dict:
 
 
 def marker_fields(private_notes: list[str]) -> dict:
-    """Values from PRIVATE notes like '[avflow] risk-area=Machine_control · hotspot=src/a.cs' (oldest first).
+    """Values from PRIVATE notes like '[avflow] risk-area=Payments · hotspot=src/a.cs' (oldest first).
 
-    Risk areas accumulate over all notes; for hotspot the latest wins; a 2.x 'machine-side=yes' still counts.
+    Risk areas accumulate over all notes; for hotspot the latest wins.
     Callers must pass private notes only: anyone, including the customer, can write a public one.
     """
     out: dict = {"risk_areas": []}
@@ -139,11 +136,9 @@ def marker_fields(private_notes: list[str]) -> dict:
         line = next((l for l in text.splitlines() if l.strip().startswith(MARKER)), "")
         if line.startswith(REQUIRED):
             continue
-        for k, v in re.findall(r"(risk-area|machine-side|hotspot)=([^·\s]+)", line):
+        for k, v in re.findall(r"(risk-area|hotspot)=([^·\s]+)", line):
             if k == "risk-area":
                 out["risk_areas"].append(v.replace("_", " "))
-            elif k == "machine-side":
-                out["machine_side"] = out.get("machine_side") or v.lower() == "yes"
             else:
                 out["hotspot"] = None if v in ("none", "-") else v
     return out

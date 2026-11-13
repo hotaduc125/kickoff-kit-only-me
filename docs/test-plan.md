@@ -21,7 +21,7 @@ Có hai cách chuẩn bị, tuỳ bạn có quyền admin hay không. avflow 2.5
 | | **0.1a — Có admin** (khuyến nghị lâu dài) | **0.1b — Không có admin** (để test ngay) |
 |---|---|---|
 | Trạng thái | Tạo Ready, In progress, In review, Ready for test | Dùng trạng thái mặc định của Redmine (bảng ánh xạ bên dưới) |
-| Risk area, Hotspot (Machine-side trong giai đoạn chuyển) | Custom field | Dòng **Size and mode** trong mô tả ticket + private note `[avflow]` |
+| Risk area, Hotspot | Custom field | Dòng **Size and mode** trong mô tả ticket + private note `[avflow]` |
 | Private note không lộ cho khách | Admin đặt quyền | **Vẫn phải nhờ admin kiểm tra** quyền của role khách hàng |
 
 **Bảng ánh xạ trạng thái khi không có admin** — trong toàn bộ file này, đọc tên trạng thái theo cột phải:
@@ -58,9 +58,8 @@ Bỏ qua mục 0.1a bên dưới nếu dùng cách này.
    |---|---|---|
    | `Risk area` | **List** | **Possible values**, mỗi dòng một giá trị: tên các vùng rủi ro trong `.avflow/project.toml` của dự án (mục 0.2b, ví dụ `Machine control`, `Build and CI`), cộng `Other high risk` và `None` · không đánh dấu Required |
    | `Hotspot` | **Text** | Không đánh dấu Required |
-   | `Machine-side` *(chỉ khi Redmine đã có từ 2.x)* | **Boolean** | Giữ nguyên; `yes` được đọc thành vùng **Machine control** (cài đặt team `machine_side_area`) |
 
-   Trường `Mode` của 2.x (nếu có) có thể để nguyên: avflow 3.0 **không đọc** nó nữa.
+   Trường `Mode` và `Machine-side` của 2.x (nếu có) có thể để nguyên: avflow 3.0 **không đọc** chúng nữa.
 
    Với **mỗi** trường, trước khi bấm **Create**:
    - mục **Trackers**: đánh dấu **Task** và **Bug**;
@@ -166,7 +165,7 @@ Cần tạo 10 ticket. Có hai cách: **Cách 1** — tạo trực tiếp trên 
    | **Risk area** *(chỉ khi có custom field — 0.1a)* | `None` hoặc để trống (T3: `Machine control`) |
    | **Hotspot** *(chỉ khi có custom field)* | Để trống (T3: tên một file cụ thể trong repo, ví dụ `src/sandbox/machine.py`) |
 
-   **Không có custom field (0.1b):** bỏ qua hai dòng trên; ghi **Risk area** và **Hotspot** ở **dòng cuối mô tả** (mục *Size and mode*), đúng định dạng `Risk area: <tên vùng>|Other high risk|None` và `Hotspot: <tên file>|none`. `High risk: yes` được đọc là *Other high risk*; `Machine-side: yes` (ticket cũ) được đọc là *Machine control*. Không còn Mode để đề xuất.
+   **Không có custom field (0.1b):** bỏ qua hai dòng trên; ghi **Risk area** và **Hotspot** ở **dòng cuối mô tả** (mục *Size and mode*), đúng định dạng `Risk area: <tên vùng>|Other high risk|None` và `Hotspot: <tên file>|none`. `High risk: yes` được đọc là *Other high risk*; `Machine-side: yes` (ticket cũ) **bị bỏ qua**. Không còn Mode để đề xuất.
 
    **Private:** **không** đánh dấu.
 
@@ -248,7 +247,7 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
 #### Những điểm riêng của từng ticket
 
 - **T2** (ticket thường, không rủi ro): dùng `test-tickets/T2-report-options.md`; **Risk area: None**. Kế hoạch chỉ chạm `src/sandbox/report.py` và test — không thuộc vùng nào, nên luồng chạy thẳng (*continue*).
-- **T3** (rủi ro): **Risk area = Machine control** và **Hotspot** = `src/sandbox/machine.py` — bằng custom field (0.1a), hoặc trong dòng *Size and mode*: `… · Risk area: Machine control · Hotspot: src/sandbox/machine.py` (0.1b). *Biến thể kiểm tra giai đoạn chuyển:* ghi `Machine-side: yes` thay cho `Risk area:` — phải ra cùng kết quả (E1b).
+- **T3** (rủi ro): **Risk area = Machine control** và **Hotspot** = `src/sandbox/machine.py` — bằng custom field (0.1a), hoặc trong dòng *Size and mode*: `… · Risk area: Machine control · Hotspot: src/sandbox/machine.py` (0.1b). *Biến thể cho E1b:* ghi `Machine-side: yes` thay cho `Risk area:` — trường cũ này phải bị bỏ qua.
 - **T8** (rủi ro chỉ lộ ra ở kế hoạch): dùng `test-tickets/T8-pause-on-cancel.md`; Risk area **None**, nhưng công việc thật sự cần sửa `src/sandbox/machine.py` (máy phải biết đang làm đơn nào) — dùng cho E1c, E11. Thêm quan hệ **Related to** T3.
 - **T4** (bị chặn): tạo xong, mở T4 → mục **Related issues** → **Add** → chọn **Blocked by** → nhập số ticket của **T2** → **Add**. Trong T2 sẽ thấy dòng *"Blocks #<T4>"*.
 - **T5** (không giao cho mình): **Assignee** = một đồng nghiệp.
@@ -349,7 +348,7 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
   - `.avflow/project.toml`: `[project]` có `presets = ["python"]`, `preset_version = 1`; `[ci] gate = "report"`; các vùng **Dependencies** (`pyproject.toml`, `requirements*.txt`, `uv.lock`, `poetry.lock` · `independent-review`), **Data migrations** (`**/migrations/**`, `alembic/versions/**` · `plan-confirmation`, `independent-review`, `checklist:Migration and rollback tested on a copy of the data`), **Configuration** (`**/settings*.py`, `.env*` · `independent-review`), **Build and CI** (có `.avflow/**`, `ci/avflow_*`, `CODEOWNERS` · `independent-review`), **Infrastructure** (`plan-confirmation`, `independent-review`); mỗi vùng có dòng `# owners = …` **đang comment**, `code-owner` chưa bật; ví dụ vùng *Payments* đang comment; `[risk.other]`; `[risk.default]` với `until` = **hôm nay + 6 tuần**.
   - `CLAUDE.md` có mục **Test environments and languages** (môi trường kiểm thử, ngôn ngữ giao diện, skill của dự án — đều là `TODO`).
   - `CODEOWNERS`: phần chú thích đầu file và khối `# >>> avflow risk areas … # <<< avflow risk areas` với dòng *"No risk area has owners yet …"*; không còn dòng `TODO`.
-  - `.gitlab-ci.avflow.yml`: job `avflow-ready-for-test` có `AVFLOW_STATUS_IN_REVIEW: "In Code Review"` và `AVFLOW_STATUS_READY_FOR_TEST: "Ready for testing"`; job mới **`avflow-risk-check`** (stage `.post`, rule `merge_request_event` với `when: always`) có `GIT_DEPTH: "0"`, `AVFLOW_FIELD_RISK_AREA: "Risk area"`, `AVFLOW_FIELD_MACHINE_SIDE: "Machine-side"`, `AVFLOW_MACHINE_SIDE_AREA: "Machine control"`; không còn chỗ giữ chỗ `{…}`.
+  - `.gitlab-ci.avflow.yml`: job `avflow-ready-for-test` có `AVFLOW_STATUS_IN_REVIEW: "In Code Review"` và `AVFLOW_STATUS_READY_FOR_TEST: "Ready for testing"`; job mới **`avflow-risk-check`** (stage `.post`, rule `merge_request_event` với `when: always`) có `GIT_DEPTH: "0"`, `AVFLOW_FIELD_RISK_AREA: "Risk area"` (không có biến nào khác về trường ticket); không còn chỗ giữ chỗ `{…}`.
   - Phần *Next* nhắc: xem lại vùng rủi ro và owners, `avflow risk check`, `avflow risk sync`, biến CI `REDMINE_URL`, `REDMINE_CI_API_KEY`, **`AVFLOW_GITLAB_TOKEN`**.
 - **Thử thêm — `--stack`:** trong một thư mục trống `mkdir /tmp/stacktest && cd /tmp/stacktest && avflow init --stack dotnet,node` → `Stack presets: dotnet, node`; vùng *Dependencies* gộp đường dẫn của cả hai (`**/*.csproj`, `package-lock.json`, …); các vùng gợi ý *Native interop*, *Installers*, *Schema*, *Build tooling* xuất hiện **dạng comment**. `avflow init --stack cobol` → ❌ *"Unknown stack: cobol (known: dotnet, go, java, node, python)"*, mã thoát 1. Dọn: `rm -rf /tmp/stacktest`.
 
@@ -534,10 +533,10 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 - **Các bước:** `/avflow:next-ticket <T1>` (Risk area None; kế hoạch chỉ tạo file mới trong `src/sandbox/` và test).
 - **Kết quả mong đợi:** `start_ticket` và `assess_plan` đều trả *required checks: none*; quyết định **continue**; không có bước chờ xác nhận nào ngoài điểm dừng của lệnh `/avflow:next-ticket`.
 
-### E1b. Machine-side của ticket cũ được đọc thành vùng (giai đoạn chuyển)
+### E1b. Machine-side của ticket 2.x bị bỏ qua — chỉ vùng rủi ro được tính
 
-- **Các bước:** tạo bản sao của T3, thay `Risk area: Machine control` bằng `Machine-side: yes` (0.1b) hoặc đánh dấu custom field *Machine-side* (0.1a, nếu Redmine có sẵn); `get_ticket`, rồi bắt đầu.
-- **Kết quả mong đợi:** `fields.risk_areas = ["Machine control"]` (cài đặt team `machine_side_area`); cùng các check như E1. *(Nếu cài đặt `machine_side_area` để trống, ticket được đọc là **Other high risk**: Plan confirmation + Independent review.)*
+- **Các bước:** tạo bản sao của T3, thay `Risk area: Machine control` bằng `Machine-side: yes` (0.1b) hoặc đánh dấu custom field *Machine-side* (0.1a, nếu Redmine còn từ 2.x); `get_ticket`, rồi bắt đầu và lập kế hoạch.
+- **Kết quả mong đợi:** `fields.risk_areas = []` và `start_ticket` trả *required checks: none* (trường cũ không còn được đọc); khi kế hoạch chạm `src/sandbox/machine.py`, `assess_plan` vẫn tìm ra vùng **Machine control** từ đường dẫn và **dừng** như E1c.
 
 ### E1c. Kế hoạch chạm file rủi ro → dừng, dù ticket không ghi vùng nào
 
@@ -760,7 +759,7 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 | D12 | Không hạ / xoá được vùng rủi ro | | |
 | E1 | Ticket có vùng rủi ro → stop | | |
 | E1a | Ticket không rủi ro → continue | | |
-| E1b | Machine-side → Machine control | | |
+| E1b | Machine-side cũ bị bỏ qua, đường dẫn vẫn bắt vùng | | |
 | E1c | Kế hoạch chạm file rủi ro → stop | | |
 | E2 | Review hai vòng | | |
 | E3 | Nới lỏng test bị bắt | | |

@@ -24,8 +24,8 @@ def repo(tmp_path):
     git(tmp_path, "add", ".")
     git(tmp_path, "commit", "-qm", "base")
     git(tmp_path, "switch", "-qc", "feature")
-    (tmp_path / "source" / "Zmotion").mkdir(parents=True)
-    (tmp_path / "source" / "Zmotion" / "Zé.cs").write_text("y")
+    (tmp_path / "source" / "Motion").mkdir(parents=True)
+    (tmp_path / "source" / "Motion" / "Zé.cs").write_text("y")
     (tmp_path / "README.md").write_text("z")
     git(tmp_path, "add", ".")
     git(tmp_path, "commit", "-qm", "work")
@@ -36,7 +36,7 @@ def repo(tmp_path):
 @needs_git
 def test_changed_files_since_the_target_branch(repo):
     files, base = GitRepo(str(repo)).changed_files("develop")
-    assert sorted(files) == ["README.md", "source/Zmotion/Zé.cs"] and base == "develop"
+    assert sorted(files) == ["README.md", "source/Motion/Zé.cs"] and base == "develop"
 
 
 @needs_git
@@ -50,8 +50,8 @@ def test_base_must_be_a_branch_not_any_revision(repo):
 def test_profile_loaded_from_repo_root(repo):
     (repo / ".avflow").mkdir()
     (repo / ".avflow" / "project.toml").write_text('[[risk.area]]\nname = "A"\npaths = ["x/**"]\nchecks = ["independent-review"]\n')
-    (repo / "source" / "Zmotion").mkdir(exist_ok=True)
-    assert GitRepo(str(repo / "source" / "Zmotion")).profile().areas[0].name == "A"
+    (repo / "source" / "Motion").mkdir(exist_ok=True)
+    assert GitRepo(str(repo / "source" / "Motion")).profile().areas[0].name == "A"
 
 
 def test_not_a_repository(tmp_path):
@@ -68,11 +68,11 @@ def test_mr_target_and_note_use_glab_with_the_mr_host_and_project():
         calls.append(cmd)
         return 0, json.dumps({"target_branch": "develop"})
     r = GitRepo("/x", runner=runner)
-    url = "https://gitlab.enclave.vn/mateo/app/-/merge_requests/87"
+    url = "https://gitlab.enclave.vn/shop/app/-/merge_requests/87"
     assert r.mr_target(url) == "develop"
     r.post_mr_note(url, "### avflow")
     assert calls[0][:4] == ["glab", "api", "--hostname", "gitlab.enclave.vn"]
-    assert calls[0][4] == "projects/mateo%2Fapp/merge_requests/87"
+    assert calls[0][4] == "projects/shop%2Fapp/merge_requests/87"
     assert "POST" in calls[1] and calls[1][-1] == "body=### avflow" and calls[1][-3].endswith("/87/notes")
 
 
@@ -101,7 +101,7 @@ def test_mr_description_read_and_written_through_glab():
         calls.append(cmd)
         return 0, json.dumps({"description": "Refs #1"})
     r = GitRepo("/x", runner=runner)
-    url = "https://gitlab.enclave.vn/mateo/app/-/merge_requests/87"
+    url = "https://gitlab.enclave.vn/shop/app/-/merge_requests/87"
     assert r.mr_description(url) == "Refs #1"
     r.set_mr_description(url, "new")
     assert "PUT" in calls[1] and calls[1][-1] == "description=new"
