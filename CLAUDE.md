@@ -84,7 +84,7 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 
 ## Current state (Nov 2026)
 
-- Version **3.0.0** in the repository (not yet released). Releases to the marketplace may lag; check `git tag` and GitHub Releases.
+- Version **3.0.0**, released Nov 13, 2026 (from branch `avflow-3.0-phase1`, not yet merged into `main`). Releases to the marketplace may lag; check `git tag` and GitHub Releases.
 - **avflow 3.0** — one flow and project-defined risk (`docs/design/avflow-3.0.md`). Decisions answered (see
   `docs/decisions.md`; Enclave's GitLab is Free). **Phases 1–3 done** on branch `avflow-3.0-phase1`: profile and
   validation (`risk.py`, standard library only — CI uses a copy), the ticket's risk area,
