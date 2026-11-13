@@ -27,7 +27,8 @@ The repository owner is the PM (Alvin). Members install releases; they never see
 | `team/avflow-team.toml` | **Team settings** for Enclave (URL, statuses, fields, workflow, models, monitor) — embedded into each release |
 | `scripts/` | `release.py`, `bootstrap.sh` / `.ps1` (install), `reset-avflow.sh` / `.ps1` (remove every trace, including old names) |
 | `docs/` | Decisions, designs, user guide, test plan, Windows test checklist |
-| `examples/avflow-sandbox/` | Small sample project (Python) with ready-made test tickets, used by the test plan |
+| `examples/avflow-sandbox/` | Small sample project (Python) with ready-made test tickets, a profile example and a sample project skill, used by the test plan |
+| `examples/mateo-project-skills/` | Drafts of Mateo's own project files (risk area, CLAUDE.md section, skills) — not shipped; copied into Mateo by the PM |
 
 ## Commands
 
@@ -62,7 +63,8 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 - **Hooks** (`avflow-git-guard`, `avflow-monitor`) must never crash Claude Code: on any unexpected input, allow and exit 0.
   Only exit 2 for a deliberate block, with a clear message.
 - **Skills are generic team skills.** No project-specific words (machine, panel, test bench, Mateo) in avflow skills —
-  those belong to the project's own repository (decided for 3.0; some 2.x skills still contain them, see the design).
+  those belong to the project's own repository: its `.avflow/project.toml`, the *Test environments and languages*
+  section of its `CLAUDE.md`, and its own skills. `tests/test_skill_words.py` enforces it.
 - **Reuse first:** prefer Matt Pocock's or Superpowers' skills unchanged; adapt only when they write to the ticket system,
   contradict team conventions, or must exist for both workflows. Credit adapted skills (MIT).
 - **Deterministic vs judgement:** anything that can be computed (rules, matching, checks) is code with tests; skills only
@@ -82,14 +84,16 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 
 ## Current state (Nov 2026)
 
-- Version **2.6.2** in the repository. Releases to the marketplace may lag; check `git tag` and GitHub Releases.
+- Version **3.0.0** in the repository (not yet released). Releases to the marketplace may lag; check `git tag` and GitHub Releases.
 - **avflow 3.0** — one flow and project-defined risk (`docs/design/avflow-3.0.md`). Decisions answered (see
-  `docs/decisions.md`; the GitLab tier is still open). **Phase 1 (core) done** on branch `avflow-3.0-phase1`: profile and
-  validation (`risk.py`), ticket risk area with the Machine-side mapping, `start_ticket` without Mode, `assess_plan`,
-  `review_requirements`, `avflow risk check/files`, `choose-mode` removed. **Phase 2 done** on the same branch: stack
-  presets (`data/presets.toml`) and the profile written by `avflow init`, CODEOWNERS block and `avflow risk sync`, MR
-  checklist section, CI gate `avflow-risk-check` (`templates/ci/avflow_risk_check.py` + a copy of `risk.py`; keep
-  `risk.py` standard-library only), `avflow risk suggest`. Next: phase 3 (generic words in skills, Mateo specifics to its
-  project skills, sandbox profile).
-- Known gaps: no GitHub Actions CI for this repository yet (the root `.gitlab-ci.yml` is a leftover); the CI gate's
-  GitLab-tier question; Windows scripts only partly tested; `avflow report` not yet run against the real Redmine/GitLab.
+  `docs/decisions.md`; the GitLab tier is still open). **Phases 1–3 done** on branch `avflow-3.0-phase1`: profile and
+  validation (`risk.py`, standard library only — CI uses a copy), ticket risk area with the Machine-side mapping,
+  `start_ticket` without Mode, `assess_plan`, `review_requirements`, `avflow risk check/files/sync/suggest`, stack presets
+  (`data/presets.toml`), CODEOWNERS block, MR checklist section, CI gate `avflow-risk-check`; generic words in skills
+  (guarded by `tests/test_skill_words.py`), the *Test environments and languages* section in the `CLAUDE.md` template,
+  Mateo drafts in `examples/mateo-project-skills/`, the sandbox profile example and project skill, the risk section of
+  `avflow report`. Next: the pilot (test plan on the real Redmine/GitLab), then decide whether the gate fails by default.
+- Before the pilot, still open: GitLab tier of gitlab.enclave.vn; the Redmine CI variables are *Protected* and do not
+  reach MR pipelines from feature branches; whether WKKM can see GitLab (check names are posted on MRs).
+- Known gaps: no GitHub Actions CI for this repository yet (the root `.gitlab-ci.yml` is a leftover); Windows scripts
+  only partly tested (`docs/WINDOWS_TEST.md` still describes the pre-2.6 setup questions); `avflow report` not yet run against the real Redmine/GitLab.

@@ -1,5 +1,5 @@
 Subject: Show totals per status under the report
-Tracker: Task · Status: Ready · Target version: Release 1 · Estimated time: 2 · Assignee: you
+Tracker: Task · Status: Ready (Enclave: New) · Target version: Release 1 · Estimated time: 2 · Assignee: you
 After creating: Related issues → Add → Blocked by → <number of T2>
 
 ## Context
@@ -29,4 +29,4 @@ Waiting for (external): none
 Open questions: none
 
 ## Size and mode
-Estimate: 1–2 h · Proposed mode: (agent proposes) · Machine-side: no · Hotspot: src/sandbox/report.py
+Estimate: 1–2 h · Risk area: None · Hotspot: src/sandbox/report.py

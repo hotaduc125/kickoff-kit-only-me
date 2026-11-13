@@ -1,0 +1,90 @@
+# avflow-sandbox — the finished risk profile of test plan 0.2b (avflow 3.0).
+# After `avflow init` (test B1) writes .avflow/project.toml, copy this file over it, replace @colleague and @you
+# with real GitLab user names (the Machine control owner must not be the MR author), then `avflow risk sync` and
+# `avflow risk check`. Differences from what init writes: owners and code-owner on Build and CI, the two project
+# areas (Machine control, Payments), and [risk.default] commented out (B8 tests it on its own).
+
+# Risk profile of this project — read by avflow's ticket tools, `avflow risk` and the CI job avflow-risk-check.
+# Reviewed by merge request like code. `avflow risk check` validates it; `avflow risk sync` regenerates CODEOWNERS.
+# Checks: plan-confirmation · independent-review · code-owner (needs owners) · "checklist:<what a person ticks>".
+# Written by `avflow init` from the stack presets (Python), then edited for the test plan.
+
+[project]
+name = "avflow-sandbox"
+presets = ["python"]
+preset_version = 1
+
+[ci]
+gate = "report"      # pilot: the CI job lists missing checks; "fail" makes it block the merge
+
+[[risk.area]]
+name   = "Dependencies"
+paths  = ["pyproject.toml", "requirements*.txt", "uv.lock", "poetry.lock"]
+# owners = ["@username"]   # then add "code-owner" to checks and run `avflow risk sync`
+checks = ["independent-review"]
+
+[[risk.area]]
+name   = "Data migrations"
+paths  = ["**/migrations/**", "alembic/versions/**"]
+# owners = ["@username"]   # then add "code-owner" to checks and run `avflow risk sync`
+checks = [
+    "plan-confirmation",
+    "independent-review",
+    "checklist:Migration and rollback tested on a copy of the data",
+]
+
+[[risk.area]]
+name   = "Configuration"
+paths  = ["**/settings*.py", ".env*"]
+# owners = ["@username"]   # then add "code-owner" to checks and run `avflow risk sync`
+checks = ["independent-review"]
+
+[[risk.area]]
+name   = "Build and CI"
+paths  = [
+    ".gitlab-ci.yml",
+    ".gitlab-ci.*.yml",
+    ".github/workflows/**",
+    ".avflow/**",
+    "ci/avflow_*",
+    "CODEOWNERS",
+    ".gitlab/CODEOWNERS",
+    "docs/CODEOWNERS",
+]
+owners = ["@you"]
+checks = ["independent-review", "code-owner"]
+
+[[risk.area]]
+name   = "Infrastructure"
+paths  = [
+    "Dockerfile*",
+    "**/Dockerfile*",
+    "docker-compose*.yml",
+    "infra/**",
+    "**/*.tf",
+    "k8s/**",
+    "helm/**",
+]
+# owners = ["@username"]   # then add "code-owner" to checks and run `avflow risk sync`
+checks = ["plan-confirmation", "independent-review"]
+
+# ---- Domain areas: the project's own risks (no preset can know them). Paths may be empty at first:
+# tickets can name the area, and paths are added once the folder structure is decided.
+
+[[risk.area]]
+name   = "Machine control"     # = the team setting machine_side_area: "Machine-side: yes" lands here
+paths  = ["src/sandbox/machine.py"]
+owners = ["@colleague"]        # not the MR author: GitLab may forbid approving your own MR (test E9)
+checks = ["plan-confirmation", "independent-review", "code-owner",
+          "checklist:Tested on the simulator by someone other than the author"]
+
+[[risk.area]]
+name   = "Payments"            # an area by concern: no paths yet, recognised only when a ticket names it
+checks = ["independent-review"]
+
+[risk.other]          # the ticket's "Other high risk": risky, but no area fits yet
+checks = ["plan-confirmation", "independent-review"]
+
+# [risk.default]        # strict start: every change outside all areas, until the date (then remove it)
+# checks = ["plan-confirmation", "independent-review"]
+# until  = "2026-12-25"

@@ -1,6 +1,6 @@
 # avflow 3.0 — Design: one flow, project-defined risk
 
-Status: **accepted** — decisions answered Nov 13, 2026 (GitLab tier still open); phases 1 and 2 built on branch `avflow-3.0-phase1` · Nov 12, 2026 · Alvin
+Status: **accepted** — decisions answered Nov 13, 2026 (GitLab tier still open); phases 1–3 built on branch `avflow-3.0-phase1`, version 3.0.0 · Nov 12, 2026 · Alvin
 Source: Claude Docs design doc (exported). This file is now the reference for implementation.
 
 ## Summary
@@ -279,6 +279,6 @@ Answered Nov 13, 2026 — see `docs/decisions.md` (3.0).
 | --- | --- | --- | --- |
 | 1 — Core | Profile file and validation, the ticket's risk area (with the Machine-side mapping), `[risk.other]` and `[risk.default]`, `start_ticket` without Mode, `assess_plan`, `review_requirements` with profile gaps, `avflow risk check/files` | 2 days | Agents follow one flow; required checks listed on MR and ticket |
 | 2 — Enforcement and new projects | `avflow-risk-check` CI job (report-only switch), CODEOWNERS generation (`avflow risk sync`), checklist section in MRs, stack detection and five presets in `avflow init`, `avflow risk suggest` | 1.5–2 days | Risky changes cannot merge without their checks; new projects start with a profile |
-| 3 — Words and docs | Generic wording in all skills, `choose-mode` removed, Mateo's specifics moved to its project skills, user guide, test plan, sample project with a profile | 0.5 day | Ready for the pilot |
+| 3 — Words and docs | Generic wording in all skills (guarded by a test), `choose-mode` removed, Mateo's specifics as drafts for its project skills (`examples/mateo-project-skills/`), user guide, test plan, sample project with a profile example and a project skill, the risk section of `avflow report` | 0.5 day (+0.5 for the report) | Ready for the pilot |
 
 After the pilot: tune the profile with `avflow report` data, then decide whether the CI gate fails by default.

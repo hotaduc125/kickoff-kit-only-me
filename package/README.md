@@ -41,6 +41,11 @@ original writes directly to a ticket the customer can read, when it differs from
 the originals and credit them (MIT): `triage` from `triage`, `glossary` and `adr` from `domain-modeling`, and the git
 guardrails from `git-guardrails-claude-code`.
 
+**Generic team skills, project skills in the project.** avflow's skills use generic words (risk area, test environment,
+the customer's environment) and a test keeps project words out of them. Each project keeps its own specifics: risk areas
+in `.avflow/project.toml`, test environments and languages in its `CLAUDE.md`, and its own skills in
+`.claude/skills/<project>-…/`.
+
 **CI stays in GitLab.** avflow has no CI of its own: the judge of quality must be independent of the agent's tools. avflow checks early on the developer's machine (guardrails, tests before the merge request) and provides the CI templates; the project's pipeline decides.
 
 **What avflow is not**
@@ -51,7 +56,7 @@ guardrails from `git-guardrails-claude-code`.
 
 **Today and next**
 
-| | Today (2.x) | Planned |
+| | Today (3.x) | Planned |
 |---|---|---|
 | Ticket system | Redmine | Jira, GitLab Issues, GitHub Issues (adapter architecture and handling rules are ready) |
 | Repository and CI | GitLab | GitHub (`gh`, GitHub Actions) |
@@ -82,7 +87,7 @@ Manual alternative: `uv tool install <wheel or package>` then `avflow setup`.
 | `avflow risk check` · `files <paths…> [--area <name>]` · `sync` · `suggest` | The project's risk profile (`.avflow/project.toml`): validate it; show which areas and checks apply to files; regenerate the CODEOWNERS block and the CI copy; propose paths from profile gaps (read-only) |
 | `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the tickets referenced by the commits, marked with their risk areas |
 | `avflow usage` | Context size per session (orchestrator) and subagent calls with their models, from the context monitor |
-| `avflow report --project <id>` | Weekly PM report (read-only): progress per release, tickets over estimate, reopened tickets, merge-request flow |
+| `avflow report --project <id>` | Weekly PM report (read-only): progress per release, tickets over estimate, reopened tickets, the risk of the reviewed changes (high-risk share, areas found only at review, profile gaps), merge-request flow |
 | `avflow uninstall` | Remove the configuration, token and MCP registration (keeps Superpowers) |
 
 ## The eleven ticket tools

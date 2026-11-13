@@ -34,6 +34,9 @@ avflow update
 
 It downloads the latest release, installs it, updates the Claude Code plugin and runs the doctor. `avflow update --check` only tells you whether an update is available.
 
+**Updating from 2.x to 3.0:** run `avflow setup` once after `avflow update` (3.0 changes the role subagents, so `avflow check`
+reports them until then), and start a new Claude Code session. There are no modes any more; see the user guide.
+
 Do not edit the installed skills: `avflow check` reports changed files.
 
 ## Redmine without admin rights

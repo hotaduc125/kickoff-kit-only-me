@@ -1,7 +1,7 @@
 # avflow-sandbox
 
 A small sample project for testing the avflow workflow end to end — Redmine tickets, Claude Code with avflow,
-GitLab merge requests and CI. Follow `avflow-test-plan.md`.
+GitLab merge requests and CI. Follow the avflow test plan (`docs/test-plan.md` in avflow-dev, shipped as `avflow-test-plan.md`).
 
 ## What is in it
 
@@ -9,10 +9,12 @@ GitLab merge requests and CI. Follow `avflow-test-plan.md`.
 |---|---|
 | `src/sandbox/orders.py` | Orders data — T2 adds a status filter |
 | `src/sandbox/report.py` | Order report — T2, T4, T7, C1, C2 |
-| `src/sandbox/machine.py` | Simulated machine control: the **sensitive path** (mode FULL) — T3 |
+| `src/sandbox/machine.py` | Simulated machine control: the risk area **Machine control** — T3, T8 |
 | `tests/` | Passing tests (`pytest`) |
 | `.gitlab-ci.yml` | Lint (ruff) and test (pytest) on `python:3.12-slim` |
-| `test-tickets/` | Paste-ready ticket descriptions for T1–T7, C1, C2 (not code — keep or delete after creating the tickets) |
+| `test-tickets/` | Paste-ready ticket descriptions for T1–T8, C1, C2 (not code — keep or delete after creating the tickets) |
+| `.claude/skills/sandbox-machine-review/` | A sample **project skill**: the project's own rules for Machine control changes, used by avflow's `qa-agent` (test F8) |
+| `avflow-profile.example.toml` | The finished risk profile of test plan 0.2b — copied over `.avflow/project.toml` after `avflow init` |
 
 ## Push to GitLab
 
@@ -41,12 +43,19 @@ uv run ruff check .
 
 ## After `avflow init` (test B1)
 
-`avflow init` adds the team files and `.gitlab-ci.avflow.yml`. Because `.gitlab-ci.yml` already exists, it is kept;
-add this at the top of `.gitlab-ci.yml`:
+`avflow init` detects the Python stack and adds the team files, `.avflow/project.toml` (the risk profile) and
+`.gitlab-ci.avflow.yml`. Because `.gitlab-ci.yml` already exists, it is kept; add this at the top of `.gitlab-ci.yml`:
 
 ```yaml
 include:
   - local: .gitlab-ci.avflow.yml
 ```
 
-In `CLAUDE.md`, fill in: build `uv run python -c "import sandbox"`, test `uv run pytest`, sensitive path `src/sandbox/machine.py`.
+Then (test plan 0.2b):
+
+1. Copy `avflow-profile.example.toml` over `.avflow/project.toml`; replace `@colleague` (owner of *Machine control*,
+   not the merge request author) and `@you` with real GitLab user names.
+2. `avflow risk sync` (CODEOWNERS) and `avflow risk check` (✅, 7 risk areas).
+3. In `CLAUDE.md`, fill in: build `uv run python -c "import sandbox"`, test `uv run pytest`; *Test environments*:
+   "automated tests only; `src/sandbox/machine.py` stands in for code that drives a real machine"; *Languages*: English;
+   *Project skills*: `sandbox-machine-review`.

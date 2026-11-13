@@ -1,0 +1,10 @@
+# Add to Mateo's .avflow/project.toml, after the preset areas (from docs/design/avflow-3.0.md).
+# The name must match the team setting machine_side_area, so tickets with "Machine-side: yes" land here.
+# TODO: confirm the paths against the repository and the owner's GitLab name, then run `avflow risk check`.
+
+[[risk.area]]
+name   = "Machine control"
+paths  = ["source/Zmotion/**", "source/MachineModes/**", "source/NullingModes/**"]
+owners = ["@q"]
+checks = ["plan-confirmation", "independent-review", "code-owner",
+          "checklist:Tested on the test bench by someone other than the author"]

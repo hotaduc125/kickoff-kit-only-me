@@ -1,6 +1,6 @@
 # avflow user guide (macOS & Windows)
 
-For avflow **2.6.2**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
+For avflow **3.0.0**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
 the same change as any behaviour it describes.
 
 ## What avflow is
@@ -41,7 +41,7 @@ No `uv`? No problem: the install script installs it.
 
 Download the release files into one folder, run the install script, enter your token; about 10 minutes.
 
-**1. Download the release files** (replace `<version>` with the version the PM announces, for example `2.6.2`):
+**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.0`):
 
 ```bash
 gh release download v<version> --repo alvin-enc/avflow-marketplace
@@ -213,7 +213,7 @@ These commands are the same on macOS and Windows.
 | Update (also brings new team settings) | `avflow update` | When the PM announces a new release |
 | Switch workflow for yourself (Superpowers ↔ Matt Pocock) | `avflow setup --advanced`, choose the other workflow | Only when the PM agrees |
 
-**`avflow update`** downloads the new release from GitHub, installs it, updates the Claude Code plugin, and runs `check`. Then **start a new Claude Code session** to load the new skills.
+**`avflow update`** downloads the new release from GitHub, installs it, updates the Claude Code plugin, and runs `check`. Then **start a new Claude Code session** to load the new skills. If `check` then reports a role subagent as *edited by hand*, the release changed the subagents (3.0 did): run `avflow setup` once to regenerate them.
 
 **When the workflow changes** — for the team in a new release, or for you with `--advanced` — setup removes the old one before installing the new one; your token, the MCP server and the team skills stay as they are. Never install both: `check` reports an error if it finds both.
 
@@ -296,9 +296,9 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 | `qa-agent` | QA without a dedicated tester: test cases from the acceptance criteria before coding, break-it review, bug reproduction, release checklist, and the two-stage review for `independent-review` (handed to the reviewer subagent) | Before coding, at review, and when a bug is reported |
 | `ticket-writer` | Drafts a ticket in the team structure, with TODOs where it cannot know and the machine-readable *Size and mode* line (estimate, risk area, hotspot) | Writing a new ticket, or turning a customer ticket into a work ticket |
 | `triage` | Classifies a customer ticket (defect S1–S3, change request, question, maintenance), checks the code, tries to reproduce, lists what is missing — never answers the customer | A ticket arrives from the customer |
-| `incident` | Field incidents: severity, the exact logs to request (one site visit), timeline, evidence-based hypotheses, reproduction, fix with a regression test, blameless review | Software misbehaves at a customer site |
+| `incident` | Field incidents: severity, the exact evidence to request (collected once), timeline, evidence-based hypotheses, reproduction, fix with a regression test, blameless review | Software misbehaves at a customer site |
 | `release` | Release notes from the merged tickets (with `avflow release-notes`), the customer engineer's acceptance checklist, pre-release checks, rollback | Preparing a release candidate or a production release |
-| `zoom-out` | Maps the code before changing it — entry points, callers, data, threads, tests, risks — without editing anything | Legacy or unfamiliar code, sensitive paths, after two failed fix attempts |
+| `zoom-out` | Maps the code before changing it — entry points, callers, data, threads, tests, risks — without editing anything | Legacy or unfamiliar code, the paths of a risk area, after two failed fix attempts |
 | `glossary` | Keeps `docs/CONTEXT.md` sharp: one term per concept, conflicts resolved, terms to avoid | A domain term is new, unclear or used with two meanings |
 | `adr` | Records a decision in `docs/adr/` when it is hard to reverse, surprising without context, and a real trade-off | An architectural or scope decision is made |
 
@@ -316,6 +316,15 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 | --- | --- |
 | **Superpowers** *or* **Matt Pocock's skills** (team setting) | The coding workflow: design, planning, implementation, tests first, debugging — mapped to the team's requirements by the `workflow` skill |
 | `handoff` (Matt Pocock, pinned) | The session handoff note, posted as a private note on the ticket |
+
+**Project skills (in the project's repository)**
+
+The team skills use generic words — *risk area*, *test environment*, *the customer's environment* — because avflow
+serves many projects. What only one project knows lives in that project: its risk areas in `.avflow/project.toml`, its
+test environments and languages in the *Test environments and languages* section of its `CLAUDE.md`, and its own skills
+in `.claude/skills/<project>-…/` (for Mateo, for example, `mateo-machine-review` for simulator and test bench checks, and
+`mateo-logs` for the field evidence to request). The team skills read that section and use a project skill when one
+exists.
 
 `triage` is adapted from Matt Pocock's skill of the same name, and `glossary` and `adr` from his `domain-modeling` skill (MIT): the team versions never write anything the customer can read and use the team's files.
 
@@ -337,7 +346,7 @@ project owns this file: edit it, add its own areas (payments, machine control, �
 It also adds the team's standard files: `CLAUDE.md`, `docs/CONTEXT.md`, a first ADR, `CODEOWNERS`, the merge request template, `.gitattributes`, `.editorconfig`, and the GitLab CI jobs that scan the commits for secrets (gitleaks, the server-side backup of the guardrails), check `Refs #id` in merge request titles, move merged tickets to *Ready for test*, and check the risk areas' required checks (`avflow-risk-check`, with its
 scripts `ci/avflow_risk_check.py` and `ci/avflow_risk.py`). Existing files are never overwritten (use `--force` to replace them); if the project already has a `.gitlab-ci.yml`, avflow tells you to add `include: - local: .gitlab-ci.avflow.yml` to it.
 
-Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands), protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
+Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands; test environments, languages and project skills), protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
 
 | Variable | Value |
 | --- | --- |
@@ -354,9 +363,27 @@ Two read-only commands turn tickets and merge requests into the documents a PM n
 | Command | Produces |
 | --- | --- |
 | `avflow release-notes --from <previous-tag> [--to <commit>] [--out notes.md]` | Release notes from the tickets referenced by the commits, high-risk tickets first and marked with their risk areas (for example **[Machine control]**), an acceptance checklist skeleton, and warnings for commits without a ticket or tickets not yet *Ready for test* |
-| `avflow report --project <identifier> [--days 7] [--out report.md]` | Weekly report: progress per release, tickets over estimate by more than 50%, tickets reopened in the period, and — when run inside the repository with `glab` signed in — merged merge requests, median time to merge and first-pipeline success |
+| `avflow report --project <identifier> [--days 7] [--out report.md]` | Weekly report: progress per release, tickets over estimate by more than 50%, tickets reopened in the period, the **risk** of the changes reviewed in the period (share of high-risk changes, tickets per risk area and where the area was found — ticket, plan or only at review — and profile gaps), and — when run inside the repository with `glab` signed in — merged merge requests, median time to merge and first-pipeline success |
 
 Set a default project once with `avflow config --edit` (`project` under `[tickets]`).
+
+The risk section reads the private notes avflow writes at start, plan and review, so it covers the tickets that reached
+`review_requirements` in the period. Areas found **only at review** mean the ticket and the plan missed a risk: improve
+the ticket or the plan habit. **Profile gaps** mean the profile is incomplete: run `avflow risk suggest` and add paths.
+After the pilot, these numbers decide whether `gate = "fail"` becomes the default.
+
+### Moving a project from 2.x to 3.0
+
+1. Members: `avflow update`, then `avflow setup` once (new subagents), and a new Claude Code session.
+2. In each project, on a feature branch: `avflow init` (adds `.avflow/project.toml`, the `avflow-risk-check` job and its
+   scripts; existing files are kept). Add the project's own areas, owners and checks; move the sensitive paths that
+   2.x listed in `CLAUDE.md` / `CODEOWNERS` into areas; fill in the *Test environments and languages* section of
+   `CLAUDE.md` (copy it from the template if the project's `CLAUDE.md` is older); `avflow risk check`, `avflow risk sync`;
+   merge.
+3. Move what the 2.x skills said about this project into its own skills. For Mateo, the drafts are in avflow-dev,
+   `examples/mateo-project-skills/` (the *Machine control* area, the `CLAUDE.md` section, `mateo-machine-review`,
+   `mateo-logs`).
+4. Tickets need no edit: the Mode field is ignored, and `Machine-side: yes` reads as the team's area (`machine_side_area`).
 
 ### Changing the team settings
 

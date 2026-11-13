@@ -5,6 +5,31 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
+## 3.0 phase 3 — generic words, project skills, report; version 3.0.0 (Nov 13, 2026)
+
+- **Project words are kept out of avflow by a test** (`tests/test_skill_words.py`): skills, commands, subagent templates
+  and the `CLAUDE.md` template may not say machine, panel, test bench, simulator, camera, site visit, recipe / SPC,
+  zh / Chinese, Mateo / WKKM / Zmotion, "sensitive path", or a 2.x mode. *Why:* principle 6 of the design was only a
+  rule in CLAUDE.md, and 2.x text had survived two phases.
+- **Where project specifics go:** risk areas in `.avflow/project.toml`; test environments, languages and the project's
+  skills in a new *Test environments and languages* section of the `CLAUDE.md` template (team skills read it instead of
+  guessing); the project's own skills in its `.claude/skills/<project>-…/`. Team skills say "if the project has its own
+  skill for this, use it".
+- **Mateo's specifics are drafts in `examples/mateo-project-skills/`** (not shipped): the *Machine control* area,
+  the `CLAUDE.md` section, `mateo-machine-review`, `mateo-logs`, the *Nulling* glossary entry. The PM moves them into
+  Mateo's repository by merge request; TODO lines need someone who knows Mateo.
+- **Sandbox:** the finished 0.2b profile ships as `avflow-profile.example.toml`, not as `.avflow/project.toml`, so test B1
+  still tests `avflow init` on a project without a profile. A sample project skill (`sandbox-machine-review`) backs test
+  F8. T6 uses `Rejected` (Enclave's Ready is `New`); T8 has a ticket file.
+- **`avflow report` gets a risk section** from the private `[avflow] required` notes of tickets reviewed in the period:
+  share of high-risk changes, tickets per area by where the area was found (ticket, plan, only at review), and profile
+  gaps. *"Checks missing at review"* from the design is reported as *areas found only at review* instead: the missing
+  checks themselves are in the CI job's log, which the report does not read.
+- **`tickets` skill names Redmine only** — the only adapter; Jira / GitLab / GitHub Issues stay "planned" in the READMEs.
+- **Version 3.0.0** (PM): the ticket flow changed in a breaking way; installation is not broken — `avflow update` works
+  from 2.6.x. Known effect: the subagent templates changed, so `avflow check` reports them as edited until the member
+  runs `avflow setup` once (documented in INSTALL.md, the user guide and test A8).
+
 ## 3.0 phase 2 — enforcement and new projects (Nov 13, 2026)
 
 - **The CI gate gets avflow's logic by copy:** `avflow init` writes `ci/avflow_risk.py` (an exact copy of `risk.py`,

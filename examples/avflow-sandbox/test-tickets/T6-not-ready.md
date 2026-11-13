@@ -1,5 +1,5 @@
 Subject: Export the report to CSV
-Tracker: Task · Status: New (with admin) / Rejected (without admin, see test plan 0.1b) · Assignee: you
+Tracker: Task · Status: Rejected (any status that is not Ready — for Enclave, Ready is New) · Assignee: you
 
 ## Context
 Some customers want the report as CSV.
@@ -11,4 +11,4 @@ TODO before Ready
 TODO before Ready
 
 ## Size and mode
-Estimate: TODO · Proposed mode: (agent proposes) · Machine-side: no · Hotspot: none
+Estimate: TODO · Risk area: None · Hotspot: none

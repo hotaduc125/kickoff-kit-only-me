@@ -1,6 +1,6 @@
 Subject: Add a pause command to the machine
-Tracker: Task · Status: Ready · Target version: Release 1 · Estimated time: 4 · Assignee: you
-(With custom fields: Machine-side = Yes, Hotspot = src/sandbox/machine.py)
+Tracker: Task · Status: Ready (Enclave: New) · Target version: Release 1 · Estimated time: 4 · Assignee: you
+(With custom fields: Risk area = Machine control, Hotspot = src/sandbox/machine.py)
 
 ## Context
 Operators need to pause the machine without losing the current position (stop() returns to the safe position).
@@ -19,7 +19,7 @@ Out of scope:
 - [ ] AC4 — The door check and the speed limit still apply (existing tests unchanged).
 
 ## Constraints
-- Sensitive path: the safety checks in machine.py must stay as they are. Mode FULL, code-owner review.
+- Risk area Machine control: the safety checks in machine.py must stay as they are; the area's checks apply (plan confirmation, independent review, code owner, test by someone else).
 
 ## Technical notes
 - File: `src/sandbox/machine.py`, tests in `tests/test_machine.py`.
@@ -33,4 +33,4 @@ Waiting for (external): none
 Open questions: none
 
 ## Size and mode
-Estimate: 3–4 h · Proposed mode: (agent proposes) · Machine-side: yes · Hotspot: src/sandbox/machine.py
+Estimate: 3–4 h · Risk area: Machine control · Hotspot: src/sandbox/machine.py

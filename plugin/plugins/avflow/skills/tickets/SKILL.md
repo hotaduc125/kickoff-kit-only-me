@@ -1,13 +1,13 @@
 ---
 name: tickets
-description: Use whenever work starts from, reports to or ends in a ticket (Redmine, Jira, GitLab or GitHub Issues) — finding your ready tickets, reading a ticket, writing private notes (plan, test cases, progress, handoff), adding a risk area or setting Hotspot, starting a ticket, assessing the plan, listing the required checks, submitting it for review, or drafting a bug ticket. The ticket system may be shared with the customer; use only the avflow-tickets MCP tools.
+description: Use whenever work starts from, reports to or ends in a ticket (Redmine) — finding your ready tickets, reading a ticket, writing private notes (plan, test cases, progress, handoff), adding a risk area or setting Hotspot, starting a ticket, assessing the plan, listing the required checks, submitting it for review, or drafting a bug ticket. The ticket system may be shared with the customer; use only the avflow-tickets MCP tools.
 ---
 
 # Tickets
 
-The ticket system (Redmine, Jira, GitLab or GitHub Issues — chosen in `avflow setup`) may be **shared with the customer**. Talk to it **only through the `avflow-tickets` MCP server** (eleven tools, identical for every system). Never call the ticket API directly and never use another ticket MCP server.
+The ticket system (Redmine) may be **shared with the customer**. Talk to it **only through the `avflow-tickets` MCP server** (eleven tools). Never call the ticket API directly and never use another ticket MCP server.
 
-Private notes: native on Redmine, GitLab (internal notes) and Jira (restricted comments). **GitHub Issues has no private comments — on GitHub the server writes your notes on the pull request instead.**
+Notes are Redmine **private notes**; the customer's role must not be allowed to see them.
 
 The rules below are also enforced by the MCP server and by the ticket system's permissions; follow them anyway.
 
@@ -18,7 +18,7 @@ The rules below are also enforced by the MCP server and by the ticket system's p
 | `whoami` | Check which account (the person's own API key) is used |
 | `list_my_ready_tickets` | Find tickets assigned to the person running you, in status Ready |
 | `get_ticket` | Read a ticket: fields, description, notes, relations, **blocked_by**, attachments |
-| `add_private_note` | Write a note — always private (on GitHub: on the pull request) |
+| `add_private_note` | Write a note — always private |
 | `set_fields` | **Add** a risk area (with a reason; never remove one) and set **Hotspot** |
 | `find_hotspot_conflicts` | See other tickets in progress with the same Hotspot |
 | `start_ticket` | Ready → In progress; returns the checks the ticket's risk area requires |
@@ -36,8 +36,7 @@ touches the paths of a risk area in the project's profile (`.avflow/project.toml
 can never drop one.
 
 The ticket's risk area is a custom field when the Redmine has one; otherwise avflow reads the **`Risk area:` line** of
-the description (`High risk: yes` means *Other high risk*; during the transition `Machine-side: yes` maps to the team's
-area). Never edit the description. If the work is riskier than the ticket says, **add** the area with `set_fields`
+the description (`High risk: yes` means *Other high risk*; older tickets' lines are mapped by the team settings). Never edit the description. If the work is riskier than the ticket says, **add** the area with `set_fields`
 (`risk_area` + `reason`) — only a person lowers or removes one.
 
 A **spike** ticket (tracker *Spike*, or `Type: spike` in the description) produces findings as a private note and

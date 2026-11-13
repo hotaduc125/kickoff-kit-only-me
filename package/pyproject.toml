@@ -1,6 +1,6 @@
 [project]
 name = "avflow"
-version = "2.6.2"
+version = "3.0.0"
 description = "One-command setup of the team's AI coding workflow: ticket system, repository/CI, Claude Code, Superpowers and team skills."
 readme = "README.md"
 requires-python = ">=3.10"

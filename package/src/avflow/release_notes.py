@@ -51,7 +51,7 @@ def build(commits: list[dict], tickets: dict[int, dict], done_statuses: list[str
     lines += ["## Acceptance checklist (customer engineer) — to complete from each ticket's acceptance criteria", ""]
     for t in sorted(tickets.values(), key=lambda x: (not x.get("risk_areas"), x["id"])):
         lines.append(f"- [ ] #{t['id']} {t['subject']}")
-    lines += ["", "## Pre-release checks", "", "- [ ] CI green on the release commit", "- [ ] Regression / simulator tests green"]
+    lines += ["", "## Pre-release checks", "", "- [ ] CI green on the release commit", "- [ ] Regression tests green (and the project's own test environments)"]
     if areas:
         lines.append(f"- [ ] High-risk changes ({', '.join(areas)}): every required check done on their merge requests")
     lines += ["- [ ] Translations reviewed (if the UI changed)", "", "## Rollback", "", "- …", ""]

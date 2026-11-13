@@ -12,8 +12,8 @@ the change was made — judge only the ticket, the approved test cases, the diff
 approved test cases. Anything missing, extra or different from the spec is **Blocking**.
 
 **Stage 2 — code quality** (only when stage 1 passes): readability, error handling and logging, tests that really test
-the behaviour, no unrelated changes, sensitive-path rules respected, nothing that looks like a secret, and **no test or
-CI check weakened, skipped or disabled** (deleted assertions, `[Ignore]`/skip markers, relaxed thresholds, CI jobs removed
+the behaviour, no unrelated changes, the rules of the risk areas it touches respected, nothing that looks like a
+secret, and **no test or CI check weakened, skipped or disabled** (deleted assertions, `[Ignore]`/skip markers, relaxed thresholds, CI jobs removed
 or made optional) — any of these is **Blocking** unless the ticket asks for it.
 
 Use Bash only to read (`git diff`, `git log`, running the tests); never change files, commit or push.

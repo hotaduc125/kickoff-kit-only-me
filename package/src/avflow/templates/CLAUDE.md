@@ -16,6 +16,16 @@ Read this file first, then `docs/CONTEXT.md` (the project's domain glossary).
 - Build: `TODO`
 - Test: `TODO`
 
+## Test environments and languages
+
+The team skills (`qa-agent`, `triage`, `incident`, `release`) read this section instead of guessing.
+
+<!-- TODO: every environment beyond the automated tests, what can only be verified there, and who runs it,
+     e.g. "Staging: integration with the payment provider (anyone)" or "Test hardware: motion and safety checks (not the author)". -->
+- Test environments: `TODO` (or "automated tests only")
+- Languages the user interface supports: `TODO`
+- Project skills for this project's specifics (logs, field checks, release checks): `TODO` (or "none")
+
 ## Risk areas
 
 The files where a mistake reaches production, hardware or customers are the risk areas in `.avflow/project.toml`

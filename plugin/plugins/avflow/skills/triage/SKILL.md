@@ -34,7 +34,7 @@ Severity for defects: **S1** production stopped or safety risk · **S2** product
    - *Already there?* Search the code for the requested behaviour by domain concept, not only by the customer's words. Report where you looked.
    - *Agreed before?* Look in the scope documents and earlier tickets: is this in scope, out of scope, or already rejected?
 3. **Recommend.** In a private note: category, severity (defects), one-paragraph reasoning, and the relevant code areas. **Stop and wait for the person.**
-4. **Verify (defects).** Try to reproduce from the reporter's steps — on the simulator if the project has one. Report: *reproduced* (with the code path), *not reproduced*, or *not enough information*. A defect that cannot be reproduced is not yet a work ticket.
+4. **Verify (defects).** Try to reproduce from the reporter's steps — in a test environment if the project has one (see its `CLAUDE.md`). Report: *reproduced* (with the code path), *not reproduced*, or *not enough information*. A defect that cannot be reproduced is not yet a work ticket.
 5. **Find what is missing.** List the exact questions or data needed (logs, versions, steps, screenshots) as a private note — specific and actionable, never "please provide more information". The person decides what to ask the customer.
 6. **Draft the work ticket** with the `ticket-writer` skill:
    - defect → `create_bug_draft` (private draft, related to the customer ticket);

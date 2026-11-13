@@ -31,6 +31,11 @@ original writes directly to a ticket the customer can read, when it differs from
 the originals and credit them (MIT): `triage` from `triage`, `glossary` and `adr` from `domain-modeling`, and the git
 guardrails from `git-guardrails-claude-code`.
 
+**Generic team skills, project skills in the project.** avflow's skills use generic words (risk area, test environment,
+the customer's environment) and a test keeps project words out of them. Each project keeps its own specifics: risk areas
+in `.avflow/project.toml`, test environments and languages in its `CLAUDE.md`, and its own skills in
+`.claude/skills/<project>-…/`.
+
 **What avflow is not**
 
 - **Not an agent.** It writes no code; Claude Code is the agent.
@@ -39,7 +44,7 @@ guardrails from `git-guardrails-claude-code`.
 
 **Today and next**
 
-| | Today (2.x) | Planned |
+| | Today (3.x) | Planned |
 |---|---|---|
 | Ticket system | Redmine | Jira, GitLab Issues, GitHub Issues (adapter architecture and handling rules are ready) |
 | Repository and CI | GitLab | GitHub (`gh`, GitHub Actions) |
