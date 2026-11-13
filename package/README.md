@@ -78,8 +78,8 @@ Manual alternative: `uv tool install <wheel or package>` then `avflow setup`.
 | `avflow check` | Check that everything works (also tells you when an update is available) |
 | `avflow update` | Install the latest release and update the plugin (`--check` only reports) |
 | `avflow config` | Show the settings and which are personal (never the token); `--edit`, `--path`, `--reset` (back to the team settings) |
-| `avflow init` | Add the team's standard files to a project repository (CLAUDE.md, docs/CONTEXT.md, ADR, CODEOWNERS, MR template, `.gitattributes`, `.editorconfig`, GitLab CI jobs: MR title check, secret scan with gitleaks, ticket to *Ready for test* after merge); never overwrites without `--force` |
-| `avflow risk check` · `avflow risk files <paths…> [--area <name>]` | Validate the project's risk profile (`.avflow/project.toml`); show which risk areas and checks apply to files |
+| `avflow init` | Add the team's standard files to a project repository (CLAUDE.md, docs/CONTEXT.md, ADR, CODEOWNERS, MR template, `.gitattributes`, `.editorconfig`, GitLab CI jobs: MR title check, secret scan with gitleaks, ticket to *Ready for test* after merge, `avflow-risk-check`) and `.avflow/project.toml` from the detected stack presets (`--stack dotnet,node,…`); never overwrites without `--force` |
+| `avflow risk check` · `files <paths…> [--area <name>]` · `sync` · `suggest` | The project's risk profile (`.avflow/project.toml`): validate it; show which areas and checks apply to files; regenerate the CODEOWNERS block and the CI copy; propose paths from profile gaps (read-only) |
 | `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the tickets referenced by the commits, marked with their risk areas |
 | `avflow usage` | Context size per session (orchestrator) and subagent calls with their models, from the context monitor |
 | `avflow report --project <id>` | Weekly PM report (read-only): progress per release, tickets over estimate, reopened tickets, merge-request flow |

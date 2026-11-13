@@ -20,7 +20,8 @@ Read this file first, then `docs/CONTEXT.md` (the project's domain glossary).
 
 The files where a mistake reaches production, hardware or customers are the risk areas in `.avflow/project.toml`
 (paths, owners, extra checks). The ticket tools apply them; `avflow risk check` validates the file and
-`avflow risk files <paths>` shows which checks a change needs.
+`avflow risk files <paths>` shows which checks a change needs. The CI job `avflow-risk-check` reports them on every
+merge request; never edit `.avflow/project.toml`, CODEOWNERS or `ci/avflow_*` to make it pass.
 
 ## Branches and commits
 
@@ -31,4 +32,4 @@ The files where a mistake reaches production, hardware or customers are the risk
 
 ## Definition of done
 
-Tests for each acceptance criterion · CI green · reviewed by a person (code owner for sensitive paths) · docs, `docs/CONTEXT.md` or an ADR updated when the design changed · handoff as a private note on the ticket.
+Tests for each acceptance criterion · CI green · reviewed by a person · the required checks of the risk areas done · docs, `docs/CONTEXT.md` or an ADR updated when the design changed · handoff as a private note on the ticket.

@@ -21,7 +21,7 @@ The repository owner is the PM (Alvin). Members install releases; they never see
 | `package/src/avflow/tickets/` | MCP server `avflow-tickets`: `core.py` (the rules), `adapters/redmine.py` (Redmine REST), `repo.py` (git / glab: profile, changed files, MR notes), `server.py`, `audit.py` |
 | `package/src/avflow/agents/` | Role subagent templates (`{model}` placeholder), generated into `~/.claude/agents/` by setup |
 | `package/src/avflow/templates/` | Files written into project repos by `avflow init` |
-| `package/src/avflow/data/` | `team.toml` (generic default; release.py replaces it with the team file), `plugin_manifest.json` (written by release.py) |
+| `package/src/avflow/data/` | `team.toml` (generic default; release.py replaces it with the team file), `presets.toml` (stack presets; bump `version` when one gains paths), `plugin_manifest.json` (written by release.py) |
 | `package/tests/` | pytest suite; `fake_redmine.py` is an in-memory Redmine, `fake_repo.py` a project repository (profile, changed files, MR notes) |
 | `plugin/` | The Claude Code plugin marketplace source: team skills and commands (`plugins/avflow/`) |
 | `team/avflow-team.toml` | **Team settings** for Enclave (URL, statuses, fields, workflow, models, monitor) — embedded into each release |
@@ -86,7 +86,10 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 - **avflow 3.0** — one flow and project-defined risk (`docs/design/avflow-3.0.md`). Decisions answered (see
   `docs/decisions.md`; the GitLab tier is still open). **Phase 1 (core) done** on branch `avflow-3.0-phase1`: profile and
   validation (`risk.py`), ticket risk area with the Machine-side mapping, `start_ticket` without Mode, `assess_plan`,
-  `review_requirements`, `avflow risk check/files`, `choose-mode` removed. Next: phase 2 (CI gate report-only, CODEOWNERS
-  sync, MR checklist, stack presets in `avflow init`, `avflow risk suggest`), then phase 3 (generic words, sandbox profile).
+  `review_requirements`, `avflow risk check/files`, `choose-mode` removed. **Phase 2 done** on the same branch: stack
+  presets (`data/presets.toml`) and the profile written by `avflow init`, CODEOWNERS block and `avflow risk sync`, MR
+  checklist section, CI gate `avflow-risk-check` (`templates/ci/avflow_risk_check.py` + a copy of `risk.py`; keep
+  `risk.py` standard-library only), `avflow risk suggest`. Next: phase 3 (generic words in skills, Mateo specifics to its
+  project skills, sandbox profile).
 - Known gaps: no GitHub Actions CI for this repository yet (the root `.gitlab-ci.yml` is a leftover); the CI gate's
   GitLab-tier question; Windows scripts only partly tested; `avflow report` not yet run against the real Redmine/GitLab.

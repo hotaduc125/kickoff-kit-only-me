@@ -517,15 +517,26 @@ def cmd_init(args) -> int:
         cfg = Config.load()
     except SystemExit:
         cfg = Config.team()
-    r = init_repo(Path(args.path), args.project, args.force, cfg)
+    stacks = [x.strip() for x in args.stack.split(",") if x.strip()] if args.stack else None
+    try:
+        r = init_repo(Path(args.path), args.project, args.force, cfg, stacks)
+    except ValueError as e:
+        bad(str(e))
+        return 1
+    print(f"  Stack presets: {', '.join(r['stacks']) or 'none detected (use --stack dotnet,node,…)'}")
     for f in r["created"]:
         ok(f"created {f}")
     for f in r["overwritten"]:
         ok(f"overwritten {f}")
     for f in r["skipped"]:
         print(f"  ➖ kept existing {f}")
-    print("\nNext: fill the TODOs in CLAUDE.md and CODEOWNERS, add terms to docs/CONTEXT.md, "
-          "and set REDMINE_URL / REDMINE_CI_API_KEY in the GitLab CI/CD variables.")
+    print("\nNext:\n"
+          "  1. .avflow/project.toml: review the risk areas, add the project's own (payments, machine control, …) and\n"
+          "     owners; then `avflow risk check` and `avflow risk sync` (CODEOWNERS).\n"
+          "  2. Fill the TODOs in CLAUDE.md; add terms to docs/CONTEXT.md.\n"
+          "  3. GitLab CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY, and AVFLOW_GITLAB_TOKEN (project access token,\n"
+          "     Reporter, read_api) for avflow-risk-check.\n"
+          "  4. Commit everything in a merge request.")
     return 0
 
 
@@ -559,12 +570,91 @@ def cmd_risk_check(args) -> int:
     other = risk.BUILTIN_OTHER if p.other_checks is None else p.other_checks
     print(f"  • {risk.OTHER} (ticket): {', '.join(other) or 'standard flow'}"
           + ("  [avflow default]" if p.other_checks is None else ""))
+    _risk_generated_warnings(root, p)
     if p.default_checks:
         if p.default_until and date.today() > p.default_until:
             print(f"  • Strict default ended on {p.default_until.isoformat()} — remove [risk.default] or move its date.")
         else:
             print(f"  • Strict default for changes outside every area: {', '.join(p.default_checks)}"
                   + (f" until {p.default_until.isoformat()}" if p.default_until else ""))
+    return 0
+
+
+def _codeowners_file(root):
+    from . import risk
+    return next((root / f for f in risk.CODEOWNERS_FILES if (root / f).exists()), root / "CODEOWNERS")
+
+
+def _risk_generated_warnings(root, p) -> None:
+    from . import risk
+    co = _codeowners_file(root)
+    if not co.exists() or not risk.codeowners_in_sync(co.read_text(encoding="utf-8"), p):
+        print(f"  ⚠️  {co.relative_to(root).as_posix()} is out of date with the profile — run `avflow risk sync`.")
+    ci = root / risk.CI_COPY
+    if ci.exists() and not risk.ci_copy_current(ci.read_text(encoding="utf-8")):
+        print(f"  ⚠️  {risk.CI_COPY} is out of date with this avflow — run `avflow risk sync`.")
+    for area, paths in risk.preset_drift(p).items():
+        print(f"  ⚠️  A newer stack preset adds paths to '{area}': {', '.join(paths)} — add them by merge request if they apply.")
+
+
+def cmd_risk_sync(args) -> int:
+    from . import risk
+    root = _risk_root(args.path)
+    p = risk.load(root)
+    if p is None or p.problems:
+        bad(f"{risk.PROFILE.as_posix()} is missing or has problems — run `avflow risk check`.")
+        return 1
+    co = _codeowners_file(root)
+    old = co.read_text(encoding="utf-8") if co.exists() else ""
+    new = risk.sync_codeowners(old, p)
+    if new != old:
+        co.write_text(new, encoding="utf-8", newline="\n")
+        ok(f"{co.relative_to(root).as_posix()} updated from the profile")
+    else:
+        ok(f"{co.relative_to(root).as_posix()} already up to date")
+    ci = root / risk.CI_COPY
+    if not ci.exists() or not risk.ci_copy_current(ci.read_text(encoding="utf-8")):
+        ci.parent.mkdir(parents=True, exist_ok=True)
+        ci.write_text(risk.ci_copy(), encoding="utf-8", newline="\n")
+        ok(f"{risk.CI_COPY} refreshed for the CI job")
+    print("  Commit the changes in a merge request.")
+    return 0
+
+
+def cmd_risk_suggest(args) -> int:
+    from datetime import datetime, timedelta, timezone
+
+    from . import risk
+    root = _risk_root(args.path)
+    profile = risk.load(root)
+    cfg, adapter = _ticket_adapter()
+    project = args.project or cfg.tickets.project
+    if not project:
+        bad("Give the project identifier: avflow risk suggest --project <identifier>.")
+        return 1
+    since = datetime.now(timezone.utc) - timedelta(days=args.days)
+    entries = []
+    for i in adapter.list_issues(project_id=project, status_id="*"):
+        try:
+            if datetime.fromisoformat(str(i.get("updated_on", "")).replace("Z", "+00:00")) < since:
+                continue
+        except ValueError:
+            continue
+        private = [j.get("notes") or "" for j in adapter.issue_raw(i["id"], include="journals").get("journals", [])
+                   if j.get("private_notes")]
+        req = risk.required_from_notes(private)
+        if req["gaps"]:
+            entries.append({"ticket": i["id"], "areas": req["areas"], "gaps": req["gaps"]})
+    sugg = risk.suggest_paths(entries, profile)
+    if not sugg:
+        ok(f"No profile gaps in the tickets updated in the last {args.days} days.")
+        return 0
+    print(f"Profile gaps from {len(entries)} reviewed tickets (last {args.days} days) — suggested paths:")
+    for s in sugg:
+        print(f"  {s['area']}: {s['path']}   ({len(s['tickets'])} tickets: {', '.join('#' + str(t) for t in s['tickets'])};"
+              f" e.g. {', '.join(s['examples'][:3])})")
+    print(f"Add the paths that belong to an area in {risk.PROFILE.as_posix()} by merge request, then `avflow risk sync`. "
+          "Nothing was changed.")
     return 0
 
 
@@ -710,6 +800,7 @@ def main(argv=None) -> int:
     it.add_argument("--path", default=".", help="repository folder (default: current folder)")
     it.add_argument("--project", help="project name used in the templates (default: folder name)")
     it.add_argument("--force", action="store_true", help="overwrite existing files")
+    it.add_argument("--stack", help="stack presets, comma separated (dotnet, node, python, java, go); default: detected")
     it.set_defaults(fn=cmd_init)
     rn = sub.add_parser("release-notes", help="release notes from the tickets referenced in a commit range")
     rn.add_argument("--from", dest="from_ref", required=True, help="previous release tag or commit")
@@ -727,6 +818,14 @@ def main(argv=None) -> int:
     rc = rks.add_parser("check", help="validate the profile and list its risk areas")
     rc.add_argument("--path", default=".", help="repository folder (default: current folder)")
     rc.set_defaults(fn=cmd_risk_check)
+    rsy = rks.add_parser("sync", help="regenerate CODEOWNERS (avflow block) and the CI copy from the profile")
+    rsy.add_argument("--path", default=".", help="repository folder (default: current folder)")
+    rsy.set_defaults(fn=cmd_risk_sync)
+    rsg = rks.add_parser("suggest", help="propose paths from the profile gaps of recently reviewed tickets (read-only)")
+    rsg.add_argument("--project", help="ticket-system project identifier (default: team setting)")
+    rsg.add_argument("--days", type=int, default=30, help="tickets updated in the last N days (default: 30)")
+    rsg.add_argument("--path", default=".", help="repository folder (default: current folder)")
+    rsg.set_defaults(fn=cmd_risk_suggest)
     rf = rks.add_parser("files", help="which risk areas and checks apply to these files")
     rf.add_argument("files", nargs="+", help="paths relative to the repository root")
     rf.add_argument("--area", action="append", help="the ticket's risk area (repeatable; 'Other high risk' allowed)")

@@ -1,4 +1,4 @@
-# Sensitive paths need a code-owner review (GitLab: enable "Require approval from code owners").
-# TODO: replace the examples with the project's sensitive paths and owners.
-# /src/Machine/        @owner-username
-# /build/              @owner-username
+# Code owners. The avflow block below is generated from .avflow/project.toml (`avflow risk sync`): edit the profile's
+# owners, not the block. Lines you add outside the block are kept.
+# GitLab Premium: enable "Require approval from code owners" on protected branches. GitLab Free: CODEOWNERS only shows
+# owners; the CI job avflow-risk-check checks their approval.

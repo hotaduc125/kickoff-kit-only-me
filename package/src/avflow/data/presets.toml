@@ -1,0 +1,68 @@
+# avflow stack presets — written into a project's .avflow/project.toml by `avflow init` (a copy the project owns).
+# Bump `version` whenever a preset gains paths: `avflow risk check` then tells projects what to add.
+# The domain decides WHICH concerns are risky; a stack only says WHERE some of them live.
+version = 1
+
+# Checks for the areas built from the presets (decided Nov 13, 2026; see docs/decisions.md).
+[checks]
+dependencies   = ["independent-review"]
+migrations     = ["plan-confirmation", "independent-review", "checklist:Migration and rollback tested on a copy of the data"]
+configuration  = ["independent-review"]
+ci             = ["independent-review"]
+infrastructure = ["plan-confirmation", "independent-review"]
+
+# Shared by every project, whatever the stack.
+[shared]
+ci = [".gitlab-ci.yml", ".gitlab-ci.*.yml", ".github/workflows/**", ".avflow/**", "ci/avflow_*",
+      "CODEOWNERS", ".gitlab/CODEOWNERS", "docs/CODEOWNERS"]
+infrastructure = ["Dockerfile*", "**/Dockerfile*", "docker-compose*.yml", "infra/**", "**/*.tf", "k8s/**", "helm/**"]
+
+[preset.dotnet]
+title = ".NET"
+detect = ["*.sln", "*.csproj"]
+dependencies = ["**/*.csproj", "Directory.Packages.props", "**/packages.lock.json"]
+migrations = ["**/Migrations/**"]
+configuration = ["**/appsettings*.json", "**/*.config"]
+suggested = [
+  { name = "Native interop", paths = ["**/*Interop*.cs", "**/NativeMethods*.cs"], checks = ["independent-review"], reason = "P/Invoke and unmanaged memory: crashes and leaks outside .NET's safety" },
+  { name = "Installers", paths = ["**/*.wixproj", "**/*.wxs"], checks = ["independent-review"], reason = "what customers install; hard to roll back" },
+]
+
+[preset.node]
+title = "Node"
+detect = ["package.json"]
+dependencies = ["**/package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock"]
+migrations = ["**/migrations/**", "prisma/migrations/**"]
+configuration = [".env*", "config/**"]
+suggested = [
+  { name = "Schema", paths = ["prisma/schema.prisma"], checks = ["plan-confirmation", "independent-review"], reason = "the data model every migration follows" },
+  { name = "Build tooling", paths = ["vite.config.*", "webpack.config.*", "tsconfig*.json"], checks = ["independent-review"], reason = "changes what ships without changing any source file" },
+]
+
+[preset.python]
+title = "Python"
+detect = ["pyproject.toml", "requirements*.txt"]
+dependencies = ["pyproject.toml", "requirements*.txt", "uv.lock", "poetry.lock"]
+migrations = ["**/migrations/**", "alembic/versions/**"]
+configuration = ["**/settings*.py", ".env*"]
+suggested = []
+
+[preset.java]
+title = "Java"
+detect = ["pom.xml", "build.gradle*"]
+dependencies = ["**/pom.xml", "**/build.gradle*", "gradle/libs.versions.toml"]
+migrations = ["**/db/migration/**", "**/db/changelog/**"]
+configuration = ["**/application*.yml", "**/application*.properties"]
+suggested = [
+  { name = "Security configuration", paths = ["**/*SecurityConfig*.java"], checks = ["independent-review"], reason = "who may call what" },
+]
+
+[preset.go]
+title = "Go"
+detect = ["go.mod"]
+dependencies = ["go.mod", "go.sum"]
+migrations = ["**/migrations/**"]
+configuration = ["config/**", ".env*"]
+suggested = [
+  { name = "API contracts", paths = ["**/*.proto"], checks = ["independent-review"], reason = "other services depend on them" },
+]

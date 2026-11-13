@@ -1,6 +1,6 @@
 # avflow 3.0 — Design: one flow, project-defined risk
 
-Status: **accepted** — decisions answered Nov 13, 2026 (GitLab tier still open); phase 1 built on branch `avflow-3.0-phase1` · Nov 12, 2026 · Alvin
+Status: **accepted** — decisions answered Nov 13, 2026 (GitLab tier still open); phases 1 and 2 built on branch `avflow-3.0-phase1` · Nov 12, 2026 · Alvin
 Source: Claude Docs design doc (exported). This file is now the reference for implementation.
 
 ## Summary

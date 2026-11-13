@@ -49,6 +49,19 @@ Required whenever `start_ticket`, `assess_plan` or `review_requirements` lists `
 1. **Stage 1 — spec.** Compare the diff with the ticket's scope, out-of-scope list and acceptance criteria, and with the approved test cases. Anything missing, extra or different from the spec is **Blocking**.
 2. **Stage 2 — code quality.** Only when stage 1 passes: readability, error handling and logging, tests that really test the behaviour, no unrelated changes, sensitive-path rules respected. (With Matt Pocock's skills, `code-review` covers both axes and may be used here.)
 3. Post the result of each stage as a private note (`add_private_note`) and as review comments on the merge request. The ticket goes to the person's review only when both stages pass.
+4. Post the summary as **one MR note** (for example `glab mr note <iid> -m "…"`) in exactly this form — the CI job
+   `avflow-risk-check` looks for it:
+
+   ```text
+   ### avflow — independent review
+   Stage 1 (spec): pass | fail
+   Stage 2 (code quality): pass | fail
+   <Blocking / Should fix / Note findings, with file and line>
+   Verdict: approve            ← only when both stages pass and nothing is Blocking
+   ```
+
+   Otherwise write `Verdict: changes requested`, fix, re-run the review in a **new** reviewer context and post a new
+   note. Never write `Verdict: approve` for a review you did not run, or that did not pass.
 
 ## Rules
 

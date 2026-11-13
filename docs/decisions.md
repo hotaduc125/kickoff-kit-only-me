@@ -5,6 +5,31 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
+## 3.0 phase 2 — enforcement and new projects (Nov 13, 2026)
+
+- **The CI gate gets avflow's logic by copy:** `avflow init` writes `ci/avflow_risk.py` (an exact copy of `risk.py`,
+  standard library only, stamped with the avflow version) and `ci/avflow_risk_check.py`. *Why:* no network or GitHub
+  access in project pipelines; one source of truth, copied. `avflow risk check` warns when the copy is outdated.
+- **The gate switch is `[ci] gate = "report" | "fail"` in `.avflow/project.toml`, and CI reads the profile from the MR's
+  target branch.** *Why:* an MR must not be able to loosen its own checks. `avflow init` puts `.avflow/**`, `ci/avflow_*`
+  and `CODEOWNERS` in the *Build and CI* area.
+- **CI uses the diff and the ticket:** the ticket's risk area (field or description line) and the checks required at
+  start and plan (private `[avflow]` notes, when the CI account may read private notes; otherwise the report says so).
+- **How CI verifies each check:** `independent-review` → an MR note starting `### avflow — independent review` with
+  `Verdict: approve`; `code-owner` → the MR approvals API (works on GitLab Free and Premium; needs the CI variable
+  `AVFLOW_GITLAB_TOKEN`, a project access token with `read_api`); `checklist:` → ticked in the avflow section of the MR
+  description; `plan-confirmation` → happens in the session, listed but not checkable in CI. Known limits: the review note
+  and the ticks cannot prove who wrote them; approving does not re-run the pipeline (re-run the job).
+- **Open — Redmine key in MR pipelines.** `REDMINE_URL` / `REDMINE_CI_API_KEY` are set *Protected*, so they do not
+  reach MR pipelines from feature branches: the gate then falls back to the diff ("could not be read"). Options: unprotect
+  them (the CI key reaches every MR pipeline), add a separate read-only Redmine key for the gate, or accept a diff-only
+  gate. To decide before the pilot.
+- **Stack presets' default checks** (owners unknown at init, so `code-owner` stays commented): Dependencies →
+  independent-review; Data migrations → plan-confirmation, independent-review, checklist "Migration and rollback tested
+  on a copy of the data"; Configuration → independent-review; Build and CI → independent-review; Infrastructure →
+  plan-confirmation, independent-review. New profiles get `[risk.default]` (plan-confirmation, independent-review) until
+  init date + 6 weeks, and `[ci] gate = "report"`.
+
 ## 3.0 — decisions taken before building (Nov 13, 2026)
 
 The PM answered the open decisions of `docs/design/avflow-3.0.md`:

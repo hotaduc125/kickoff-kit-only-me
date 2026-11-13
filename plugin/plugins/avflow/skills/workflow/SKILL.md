@@ -29,9 +29,9 @@ A spike stops after the plan: findings as a private note, **no production code**
 | Check | How it is satisfied |
 |---|---|
 | `plan-confirmation` | Stop after `assess_plan`; the assignee confirms the plan in the session before any code |
-| `independent-review` | `qa-agent` section E: two-stage review by the `avflow-reviewer` subagent in a fresh context; post the result on the MR |
-| `code-owner` | One of the area's owners approves the MR — a person; list it for them, never approve yourself |
-| `checklist:<text>` | A person ticks that item in the MR description — never tick it yourself |
+| `independent-review` | `qa-agent` section E: two-stage review by the `avflow-reviewer` subagent in a fresh context; the MR note `### avflow — independent review` … `Verdict: approve` |
+| `code-owner` | One of the area's owners approves the MR — a person; list it for them, never approve yourself. The owner re-runs `avflow-risk-check` after approving |
+| `checklist:<text>` | A person ticks that item in the avflow section of the MR description — never tick it yourself |
 
 **Always required, whatever the risk:** tests for each acceptance criterion, a green pipeline, a person's review and
 merge, a handoff note.

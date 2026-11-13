@@ -99,3 +99,20 @@ class GitRepo:
                               f"projects/{quote(path, safe='')}/merge_requests/{iid}/notes", "--raw-field", f"body={text}"])
         if code != 0:
             raise RepoError(f"glab could not comment on the MR: {out.strip()[:200]}")
+
+    def mr_description(self, url: str) -> str:
+        host, path, iid = self._gitlab(url)
+        code, out = self.run(["glab", "api", "--hostname", host, f"projects/{quote(path, safe='')}/merge_requests/{iid}"])
+        if code != 0:
+            raise RepoError(f"glab could not read the MR: {out.strip()[:200]}")
+        try:
+            return json.loads(out).get("description") or ""
+        except (ValueError, AttributeError) as e:
+            raise RepoError("glab returned something that is not the MR") from e
+
+    def set_mr_description(self, url: str, text: str) -> None:
+        host, path, iid = self._gitlab(url)
+        code, out = self.run(["glab", "api", "--hostname", host, "--method", "PUT",
+                              f"projects/{quote(path, safe='')}/merge_requests/{iid}", "--raw-field", f"description={text}"])
+        if code != 0:
+            raise RepoError(f"glab could not update the MR description: {out.strip()[:200]}")

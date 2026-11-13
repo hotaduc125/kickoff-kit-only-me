@@ -92,3 +92,16 @@ def test_glab_failure_raises():
 
 def test_default_runner_is_the_shared_one():
     assert GitRepo("/x").run is st.run
+
+
+def test_mr_description_read_and_written_through_glab():
+    calls = []
+
+    def runner(cmd, interactive=False):
+        calls.append(cmd)
+        return 0, json.dumps({"description": "Refs #1"})
+    r = GitRepo("/x", runner=runner)
+    url = "https://gitlab.enclave.vn/mateo/app/-/merge_requests/87"
+    assert r.mr_description(url) == "Refs #1"
+    r.set_mr_description(url, "new")
+    assert "PUT" in calls[1] and calls[1][-1] == "description=new"

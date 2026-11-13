@@ -5,6 +5,7 @@ avflow knows *that* something is risky; the project's profile says *what* is ris
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -17,6 +18,9 @@ else:  # pragma: no cover
     import tomli as tomllib
 
 PROFILE = Path(".avflow") / "project.toml"
+MARKER = "[avflow]"                  # private ticket notes written by avflow's tools start their first line with it
+REQUIRED = MARKER + " required "     # … followed by JSON: {"stage", "areas", "checks", "gaps"}
+GATES = ("report", "fail")
 OTHER = "Other high risk"
 NONE = "None"
 CHECKS = ("plan-confirmation", "independent-review", "code-owner")     # plus "checklist:<text>"
@@ -51,6 +55,9 @@ class Profile:
     other_checks: list[str] | None = None          # [risk.other]; None → BUILTIN_OTHER
     default_checks: list[str] = field(default_factory=list)
     default_until: date | None = None
+    gate: str = "report"                           # [ci] gate: "report" (pilot) or "fail"
+    presets: list[str] = field(default_factory=list)
+    preset_version: int | None = None
     problems: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -80,6 +87,139 @@ def key(name: str) -> str:
 
 def is_none(name: str) -> bool:
     return key(name) in ("", "none", "no", "-", "n/a")
+
+
+def split_areas(v) -> list[str]:
+    vals = v if isinstance(v, list) else re.split(r"\s*,\s*", str(v or ""))
+    return [x.strip() for x in vals if isinstance(x, str) and x.strip() and not is_none(x)]
+
+
+def unique_areas(areas: list[str]) -> list[str]:
+    seen, out = set(), []
+    for a in areas:
+        if key(a) not in seen:
+            seen.add(key(a))
+            out.append(a)
+    return out
+
+
+# ---------- facts from the ticket's text (shared by the ticket adapter and the CI gate)
+def description_fields(description: str) -> dict:
+    """Values a person wrote in the description's "Size and mode" line."""
+    d = description or ""
+    out: dict = {}
+    m = re.search(r"(?im)machine[- ]side\s*:\s*\**\s*(yes|no)\b", d)
+    if m:
+        out["machine_side"] = m.group(1).lower() == "yes"
+    m = re.search(r"(?im)hotspot\s*:\s*\**\s*`?([^`\n·|*]+?)`?\s*\**\s*(?:[·|]|$)", d)
+    if m:
+        v = m.group(1).strip()
+        out["hotspot"] = None if v.lower() in ("none", "-", "n/a", "") or v.lower().startswith("todo") else v
+    m = re.search(r"(?im)risk[ -]area\s*:\s*\**\s*([^\n·|*]*?)\s*\**\s*(?:[·|]|$)", d)
+    if m:
+        out["risk_areas"] = split_areas(m.group(1))
+    m = re.search(r"(?im)high[ -]risk\s*:\s*\**\s*(yes|no)\b", d)
+    if m:
+        out["risk_areas"] = out.get("risk_areas", []) + ([OTHER] if m.group(1).lower() == "yes" else [])
+    if re.search(r"(?im)\btype\s*:\s*\**\s*spike\b", d):
+        out["spike"] = True
+    return out
+
+
+def marker_fields(private_notes: list[str]) -> dict:
+    """Values from PRIVATE notes like '[avflow] risk-area=Machine_control · hotspot=src/a.cs' (oldest first).
+
+    Risk areas accumulate over all notes; for hotspot the latest wins; a 2.x 'machine-side=yes' still counts.
+    Callers must pass private notes only: anyone, including the customer, can write a public one.
+    """
+    out: dict = {"risk_areas": []}
+    for text in private_notes or []:
+        if MARKER not in (text or ""):
+            continue
+        line = next((l for l in text.splitlines() if l.strip().startswith(MARKER)), "")
+        if line.startswith(REQUIRED):
+            continue
+        for k, v in re.findall(r"(risk-area|machine-side|hotspot)=([^·\s]+)", line):
+            if k == "risk-area":
+                out["risk_areas"].append(v.replace("_", " "))
+            elif k == "machine-side":
+                out["machine_side"] = out.get("machine_side") or v.lower() == "yes"
+            else:
+                out["hotspot"] = None if v in ("none", "-") else v
+    return out
+
+
+def required_from_notes(private_notes: list[str]) -> dict:
+    """Union of the checks recorded at each stage in PRIVATE '[avflow] required {…}' notes."""
+    out: dict = {"checks": [], "areas": {}, "stages": [], "gaps": []}
+    for text in private_notes or []:
+        for line in (text or "").splitlines():
+            if not line.startswith(REQUIRED):
+                continue
+            try:
+                d = json.loads(line[len(REQUIRED):])
+            except ValueError:
+                continue
+            if not isinstance(d, dict):
+                continue
+            out["checks"] = grow(out["checks"], [c for c in d.get("checks", []) if isinstance(c, str)])
+            for k, v in (d.get("areas") or {}).items():
+                out["areas"].setdefault(k, v)
+            out["stages"].append(d.get("stage"))
+            out["gaps"] += [g for g in d.get("gaps", []) if isinstance(g, str) and g not in out["gaps"]]
+    return out
+
+
+def required_line(stage: str, areas: dict, checks: list, gaps: list | None = None) -> str:
+    d = {"stage": stage, "areas": areas, "checks": checks}
+    if gaps:
+        d["gaps"] = gaps
+    return REQUIRED + json.dumps(d, ensure_ascii=False)
+
+
+# ---------- the avflow section of the merge request description (written by review_requirements, read by CI)
+MR_BEGIN = "<!-- avflow:checks -->"
+MR_END = "<!-- /avflow:checks -->"
+_BOX = re.compile(r"^\s*[-*]\s*\[([ xX])\]\s*(.+?)\s*$")
+
+
+def _mr_split(desc: str) -> tuple[str, str | None, str]:
+    d = desc or ""
+    b = d.find(MR_BEGIN)
+    e = d.find(MR_END, b + 1) if b >= 0 else -1
+    if b < 0 or e < 0:
+        return d, None, ""
+    return d[:b], d[b:e + len(MR_END)], d[e + len(MR_END):]
+
+
+def ticked_checklist(desc: str) -> set[str]:
+    """Checklist texts ticked inside the avflow section only (ticks elsewhere in the description do not count)."""
+    section = _mr_split(desc)[1] or ""
+    return {m.group(2) for m in map(_BOX.match, section.splitlines()) if m and m.group(1) in "xX"}
+
+
+def update_mr_description(desc: str, checks: list[str]) -> str:
+    """Write or refresh the avflow section, keeping the ticks a person already set and everything outside it."""
+    before, _, after = _mr_split(desc)
+    ticked = ticked_checklist(desc)
+    L = [MR_BEGIN, "### Required checks (avflow)", ""]
+    items = [c[len(CHECKLIST):].strip() for c in checks if c.startswith(CHECKLIST)]
+    others = [c for c in checks if not c.startswith(CHECKLIST)]
+    if not checks:
+        L.append("None beyond the standard flow (tests, green pipeline, a person's review).")
+    if items:
+        L.append("Ticked by a person (never by the agent):")
+        L += [f"- [{'x' if t in ticked else ' '}] {t}" for t in items]
+    if others:
+        L += ([""] if items else []) + ["Also required (checked by the CI job avflow-risk-check where it can):"]
+        L += [f"- {describe(c)}" for c in others]
+    L.append(MR_END)
+    section = "\n".join(L)
+    if not before and not after and not (desc or "").strip():
+        return section + "\n"
+    if _mr_split(desc)[1] is None:
+        return (desc or "").rstrip("\n") + "\n\n" + section + "\n"
+    return before + section + after
 
 
 # ---------- paths
@@ -160,7 +300,16 @@ def parse(text: str) -> Profile:
     except tomllib.TOMLDecodeError as e:
         p.problems.append(f"not valid TOML: {e}")
         return p
-    p.name = str((data.get("project") or {}).get("name", "") or "")
+    proj = data.get("project") or {}
+    p.name = str(proj.get("name", "") or "")
+    p.presets = [x for x in proj.get("presets", []) if isinstance(x, str)] if isinstance(proj.get("presets"), list) else []
+    if isinstance(proj.get("preset_version"), int):
+        p.preset_version = proj["preset_version"]
+    gate = (data.get("ci") or {}).get("gate", "report")
+    if gate not in GATES:
+        p.problems.append(f"[ci]: gate must be \"report\" or \"fail\", not {gate!r}")
+    else:
+        p.gate = gate
     r = data.get("risk") or {}
     if not isinstance(r, dict):
         p.problems.append("[risk] must be a table")
@@ -301,3 +450,215 @@ def requirements(profile: Profile | None, ticket_areas: list[str], files: list[s
         r.gaps = unmatched
     r.checks = found
     return r
+
+
+# ---------- stack presets (used by `avflow init` and `avflow risk check`; not needed by the CI copy)
+SKIP_DIRS = {".git", "node_modules", "bin", "obj", ".venv", "venv", "dist", "build", "target", "vendor", "packages", ".idea"}
+CONCERNS = (("dependencies", "Dependencies"), ("migrations", "Data migrations"), ("configuration", "Configuration"))
+SHARED = (("ci", "Build and CI"), ("infrastructure", "Infrastructure"))
+
+
+def load_presets() -> dict:
+    from importlib import resources
+    return tomllib.loads(resources.files("avflow").joinpath("data/presets.toml").read_text(encoding="utf-8"))
+
+
+def preset_names(presets: dict | None = None) -> list[str]:
+    return sorted((presets or load_presets())["preset"])
+
+
+def detect_stacks(root: Path | str, presets: dict | None = None, depth: int = 3) -> list[str]:
+    """Presets whose marker files exist in the repository (a few folders deep, vendored folders skipped)."""
+    presets = presets or load_presets()
+    names: list[str] = []
+
+    def walk(d: Path, level: int):
+        try:
+            entries = list(d.iterdir())
+        except OSError:
+            return
+        for e in entries:
+            if e.is_file():
+                names.append(e.name)
+            elif e.is_dir() and level < depth and e.name not in SKIP_DIRS and not e.name.startswith("."):
+                walk(e, level + 1)
+    walk(Path(root), 0)
+    return [k for k in preset_names(presets)
+            if any(glob_match(pat, n) for pat in presets["preset"][k]["detect"] for n in names)]
+
+
+def _preset_areas(stacks: list[str], presets: dict) -> list[tuple[str, str, list[str]]]:
+    """(concern, area name, paths) for the stacks, then the shared areas; empty concerns are left out."""
+    out = []
+    for concern, title in CONCERNS:
+        paths = list(dict.fromkeys(p for st in stacks for p in presets["preset"][st].get(concern, [])))
+        if paths:
+            out.append((concern, title, paths))
+    for concern, title in SHARED:
+        out.append((concern, title, list(presets["shared"][concern])))
+    return out
+
+
+def _toml_list(items: list[str]) -> str:
+    q = [json.dumps(x, ensure_ascii=False) for x in items]
+    one = "[" + ", ".join(q) + "]"
+    return one if len(one) <= 90 else "[\n" + "".join(f"    {x},\n" for x in q) + "]"
+
+
+def render_profile(name: str, stacks: list[str], today: date | None = None, presets: dict | None = None) -> str:
+    """The .avflow/project.toml that `avflow init` writes: preset areas, suggestions (commented), defaults."""
+    from datetime import timedelta
+    presets = presets or load_presets()
+    unknown = [x for x in stacks if x not in presets["preset"]]
+    if unknown:
+        raise ValueError(f"Unknown stack: {', '.join(unknown)} (known: {', '.join(preset_names(presets))})")
+    today = today or date.today()
+    titles = ", ".join(presets["preset"][x]["title"] for x in stacks) or "none detected"
+    L = [
+        "# Risk profile of this project — read by avflow's ticket tools, `avflow risk` and the CI job avflow-risk-check.",
+        "# Reviewed by merge request like code. `avflow risk check` validates it; `avflow risk sync` regenerates CODEOWNERS.",
+        "# Checks: plan-confirmation · independent-review · code-owner (needs owners) · \"checklist:<what a person ticks>\".",
+        f"# Written by `avflow init` on {today.isoformat()} from the stack presets ({titles}). The project owns it now.",
+        "",
+        "[project]",
+        f"name = {json.dumps(name, ensure_ascii=False)}",
+        f"presets = {_toml_list(stacks)}",
+        f"preset_version = {presets['version']}",
+        "",
+        "[ci]",
+        "gate = \"report\"      # pilot: the CI job lists missing checks; \"fail\" makes it block the merge",
+    ]
+    for concern, title, paths in _preset_areas(stacks, presets):
+        L += ["", "[[risk.area]]", f"name   = {json.dumps(title)}", f"paths  = {_toml_list(paths)}",
+              "# owners = [\"@username\"]   # then add \"code-owner\" to checks and run `avflow risk sync`",
+              f"checks = {_toml_list(presets['checks'][concern])}"]
+    sugg = [(st, x) for st in stacks for x in presets["preset"][st].get("suggested", [])]
+    if sugg:
+        L += ["", "# ---- Suggested by the stack presets: uncomment what applies to this project."]
+        for st, x in sugg:
+            L += ["", f"# [[risk.area]]   # {presets['preset'][st]['title']}: {x['reason']}",
+                  f"# name   = {json.dumps(x['name'])}", f"# paths  = {json.dumps(x['paths'])}",
+                  f"# checks = {json.dumps(x['checks'])}"]
+    L += ["", "# ---- Domain areas: the project's own risks (no preset can know them). Paths may be empty at first:",
+          "# tickets can name the area, and paths are added once the folder structure is decided.",
+          "", "# [[risk.area]]", "# name   = \"Payments\"", "# paths  = []", "# owners = [\"@lead\"]",
+          "# checks = [\"plan-confirmation\", \"independent-review\", \"code-owner\", \"checklist:Refund and failure paths tested\"]",
+          "", "[risk.other]          # the ticket's \"Other high risk\": risky, but no area fits yet",
+          "checks = [\"plan-confirmation\", \"independent-review\"]",
+          "", "[risk.default]        # strict start: every change outside all areas, until the date (then remove it)",
+          "checks = [\"plan-confirmation\", \"independent-review\"]",
+          f"until  = \"{(today + timedelta(weeks=6)).isoformat()}\"", ""]
+    return "\n".join(L)
+
+
+def preset_drift(profile: Profile, presets: dict | None = None) -> dict[str, list[str]]:
+    """Paths a newer preset has that the profile's area of the same name lacks (only after a preset version bump)."""
+    presets = presets or load_presets()
+    if not profile.presets or profile.preset_version is None or profile.preset_version >= presets["version"]:
+        return {}
+    stacks = [x for x in profile.presets if x in presets["preset"]]
+    out = {}
+    for _, title, paths in _preset_areas(stacks, presets):
+        a = profile.area(title)
+        if a is None:
+            continue                       # the project removed the area: its choice
+        missing = [x for x in paths if x not in a.paths]
+        if missing:
+            out[a.name] = missing
+    return out
+
+
+# ---------- generated files: CODEOWNERS block and the CI copy of this module
+CODEOWNERS_BEGIN = "# >>> avflow risk areas"
+CODEOWNERS_END = "# <<< avflow risk areas"
+CODEOWNERS_FILES = ("CODEOWNERS", "docs/CODEOWNERS", ".gitlab/CODEOWNERS")     # GitLab uses the first that exists
+CI_COPY = "ci/avflow_risk.py"
+
+
+def codeowners_pattern(glob: str) -> str:
+    """Profile globs are relative to the repository root; CODEOWNERS anchors a pattern with a leading slash."""
+    g = norm_path(glob)
+    return g if g.startswith("**/") else "/" + g
+
+
+def codeowners_block(profile: Profile) -> str:
+    L = [f"{CODEOWNERS_BEGIN} — generated by `avflow risk sync` from {PROFILE.as_posix()}; edit the profile, not this block",
+         "# (When patterns overlap, GitLab uses the LAST matching line.)"]
+    for a in profile.areas:
+        if not a.owners:
+            continue
+        if not a.paths:
+            L.append(f"# {a.name}: no paths yet — owners {' '.join(a.owners)} apply once paths are added")
+            continue
+        L.append(f"# {a.name}")
+        L += [f"{codeowners_pattern(g)} {' '.join(a.owners)}" for g in a.paths]
+    if len(L) == 2:
+        L.append("# No risk area has owners yet: add owners = [\"@username\"] in the profile, then run `avflow risk sync`.")
+    L.append(CODEOWNERS_END)
+    return "\n".join(L)
+
+
+def _split_block(text: str) -> tuple[str, str | None, str]:
+    lines = (text or "").splitlines()
+    try:
+        b = next(i for i, l in enumerate(lines) if l.startswith(CODEOWNERS_BEGIN))
+        e = next(i for i in range(b, len(lines)) if lines[i].startswith(CODEOWNERS_END))
+    except StopIteration:
+        return text or "", None, ""
+    before, after = "\n".join(lines[:b]), "\n".join(lines[e + 1:])
+    return (before + "\n" if before else ""), "\n".join(lines[b:e + 1]), (after + "\n" if after else "")
+
+
+def sync_codeowners(text: str, profile: Profile) -> str:
+    """Replace (or append) the avflow block; every line outside it is kept as written."""
+    before, block, after = _split_block(text)
+    if block is None:
+        sep = "" if not before or before.endswith("\n\n") else ("\n" if before.endswith("\n") else "\n\n")
+        return before + sep + codeowners_block(profile) + "\n"
+    return before + codeowners_block(profile) + "\n" + after
+
+
+def codeowners_in_sync(text: str, profile: Profile) -> bool:
+    return _split_block(text)[1] == codeowners_block(profile)
+
+
+def _own_source() -> str:
+    return Path(__file__).read_text(encoding="utf-8")
+
+
+def ci_copy() -> str:
+    try:
+        from avflow import __version__ as v
+    except ImportError:          # inside the CI copy itself
+        v = "copy"
+    return (f"# avflow {v} — copy of avflow's risk.py for the CI job avflow-risk-check. Do not edit:\n"
+            "# `avflow risk sync` refreshes it.\n" + _own_source())
+
+
+def ci_copy_current(text: str) -> bool:
+    body = "\n".join((text or "").splitlines(keepends=False)[2:])
+    return body == "\n".join(_own_source().splitlines(keepends=False))
+
+
+# ---------- profile gaps → suggested paths (`avflow risk suggest`; a person decides)
+def suggest_paths(entries: list[dict], profile: Profile | None) -> list[dict]:
+    """entries: {"ticket", "areas" (name → source), "gaps"} from review notes. One suggestion per (area, folder)."""
+    found: dict[tuple[str, str], dict] = {}
+    for e in entries:
+        blamed = [a for a, src in (e.get("areas") or {}).items() if src == "ticket"] or ["(high-risk ticket)"]
+        for g in e.get("gaps") or []:
+            g = norm_path(g)
+            if profile and any(glob_match(p, g) for a in profile.areas for p in a.paths):
+                continue                              # the profile covers it by now
+            folder = g.rsplit("/", 1)[0] + "/**" if "/" in g else g
+            for a in blamed:
+                s = found.setdefault((a, folder), {"area": a, "path": folder, "tickets": [], "examples": []})
+                if e["ticket"] not in s["tickets"]:
+                    s["tickets"].append(e["ticket"])
+                if g not in s["examples"]:
+                    s["examples"].append(g)
+    out = sorted(found.values(), key=lambda s: (-len(s["tickets"]), s["area"], s["path"]))
+    for s in out:
+        s["tickets"].sort()
+        s["examples"].sort()
+    return out

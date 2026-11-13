@@ -23,14 +23,22 @@ def template_files() -> list[tuple[str, str]]:
     return sorted(out)
 
 
-def init_repo(target: Path, project: str | None = None, force: bool = False, cfg=None) -> dict[str, list[str]]:
+def init_repo(target: Path, project: str | None = None, force: bool = False, cfg=None,
+              stacks: list[str] | None = None, today: date | None = None) -> dict:
+    from . import risk
     target = Path(target)
     project = project or target.resolve().name
     if cfg is None:
         from .config import Config
         cfg = Config.team()
-    names = {"{status_in_review}": cfg.tickets.status_in_review, "{status_ready_for_test}": cfg.tickets.status_ready_for_test}
-    result = {"created": [], "skipped": [], "overwritten": []}
+    t = cfg.tickets
+    stacks = risk.detect_stacks(target) if stacks is None else list(stacks)
+    profile_text = risk.render_profile(project, stacks, today)          # raises ValueError for an unknown stack
+    names = {"{status_in_review}": t.status_in_review, "{status_ready_for_test}": t.status_ready_for_test,
+             "{field_risk_area}": t.field_risk_area, "{field_machine_side}": t.field_machine_side,
+             "{machine_side_area}": t.machine_side_area}
+    result = {"created": [], "skipped": [], "overwritten": [], "stacks": stacks}
+    profile_existed = (target / risk.PROFILE).exists()
     for rel, text in template_files():
         if rel.startswith("__"):
             continue
@@ -45,6 +53,22 @@ def init_repo(target: Path, project: str | None = None, force: bool = False, cfg
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(content, encoding="utf-8", newline="\n")
         result["overwritten" if existed else "created"].append(rel)
+    generated = [(risk.PROFILE.as_posix(), profile_text), (risk.CI_COPY, risk.ci_copy())]
+    for rel, content in generated:
+        dst = target / rel
+        if dst.exists() and not force:
+            result["skipped"].append(rel)
+            continue
+        existed = dst.exists()
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(content, encoding="utf-8", newline="\n")
+        result["overwritten" if existed else "created"].append(rel)
+    co = target / "CODEOWNERS"
+    if "CODEOWNERS" not in result["skipped"]:            # written from the template just now: add the avflow block
+        prof = risk.load(target)
+        if prof is not None and not prof.problems:
+            co.write_text(risk.sync_codeowners(co.read_text(encoding="utf-8"), prof), encoding="utf-8", newline="\n")
+    result["profile_existed"] = profile_existed
     ci = target / ".gitlab-ci.yml"
     if not ci.exists():
         ci.write_text("include:\n  - local: .gitlab-ci.avflow.yml\n\n# Add the project's build and test jobs below.\n",

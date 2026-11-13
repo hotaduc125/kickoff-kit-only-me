@@ -20,7 +20,7 @@ checks = ["code-owner"]
 class FakeRepo:
     def __init__(self, profile=MATEO, files=(), target="develop", post_error=None):
         self.profile_text, self.files, self.target, self.post_error = profile, list(files), target, post_error
-        self.posted, self.bases = [], []
+        self.posted, self.bases, self.description = [], [], ""
 
     def profile(self):
         if self.profile_text is None:
@@ -38,3 +38,13 @@ class FakeRepo:
         if self.post_error:
             raise RepoError(self.post_error)
         self.posted.append((url, text))
+
+    def mr_description(self, url):
+        if self.post_error:
+            raise RepoError(self.post_error)
+        return self.description
+
+    def set_mr_description(self, url, text):
+        if self.post_error:
+            raise RepoError(self.post_error)
+        self.description = text

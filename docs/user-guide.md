@@ -101,8 +101,8 @@ Open a terminal in the project repository (latest `develop`), run `claude`, then
 2. **The agent writes a short plan** (approach, files, tests) — for every ticket, even a one-line change — and posts it as a private note together with the risk check (`assess_plan`). If the plan names files in a risk area, checks are added.
 3. **Confirm the plan** when the agent says it must stop (the `plan-confirmation` check), for example *"Plan OK, go ahead"*. `/avflow:next-ticket` always stops here so you can look at the plan.
 4. **The agent implements** with the team's workflow (the `workflow` skill guides each step): the planner subagent plans larger or risky work, the implementer writes the tests first and the code.
-5. **The agent opens the merge request** from branch `feature/<id>-<name>`, with `Refs #<id>` in the title, and waits for its first pipeline — fixing the cause until it is green, never weakening a test. Then it lists the **final required checks** from the files the branch really changed (`review_requirements`), posts them on the MR and the ticket, does its own checks — for `independent-review`, the reviewer subagent's two-stage review (spec, then code quality) — and only then moves the ticket to **In review**. Owner approvals and checklist items are for people; the agent never ticks them.
-6. **A person reviews and merges**, after the required checks are done. The agent never merges, and cannot push to `develop` or `main`. After the merge, the project's CI job moves the ticket to **Ready for test** with a private note linking the commit and the pipeline — or, in projects without that job, a person does it.
+5. **The agent opens the merge request** from branch `feature/<id>-<name>`, with `Refs #<id>` in the title, and waits for its first pipeline — fixing the cause until it is green, never weakening a test. Then it lists the **final required checks** from the files the branch really changed (`review_requirements`), posts them on the MR and the ticket, writes the checklist items into an avflow section of the MR description, does its own checks — for `independent-review`, the reviewer subagent's two-stage review (spec, then code quality), posted as an MR note — and only then moves the ticket to **In review**. Owner approvals and checklist items are for people; the agent never ticks them.
+6. **A person reviews and merges**, after the required checks are done. The CI job **`avflow-risk-check`** shows on every merge request which checks are done and which are missing (see *The CI gate* below). Code owners: after approving, **re-run that job** — an approval does not start a pipeline. The agent never merges, and cannot push to `develop` or `main`. After the merge, the project's CI job moves the ticket to **Ready for test** with a private note linking the commit and the pipeline — or, in projects without that job, a person does it.
 7. **At the end of the session**, ask the agent for a **handoff** (what was done, what is left, how to verify) as a private note.
 8. **After testing or acceptance**, a person moves the ticket to **Resolved**, then **Closed**.
 
@@ -141,8 +141,35 @@ Risk is checked three times — the ticket's area when it starts, the planned fi
 when they belong. Paths use `*` (within a folder) and `**` (any depth), relative to the repository root; an area can
 have no paths yet and still be picked on tickets.
 
-- `avflow risk check` — validates the profile and lists its areas.
+- `avflow risk check` — validates the profile and lists its areas; warns when CODEOWNERS or the CI copy is out of date,
+  or when a newer stack preset adds paths.
 - `avflow risk files <paths…> [--area "<name>"]` — shows which areas and checks apply, before you merge a profile change.
+- `avflow risk sync` — regenerates the avflow block of CODEOWNERS from the areas' `owners` (lines outside the block are
+  kept) and refreshes `ci/avflow_risk.py`. Commit the result in a merge request.
+- `avflow risk suggest [--days 30]` — read-only: collects the profile gaps of recently reviewed tickets and proposes
+  paths per area. A person decides and changes the profile by merge request.
+
+### The CI gate
+
+`avflow init` adds the job **`avflow-risk-check`** to every merge request pipeline. It works out the required checks
+from facts the merge request cannot change — the profile **on the target branch**, the changed files, and the ticket in
+the title (its risk area; the checks recorded at start and plan, when the Redmine CI account may view private notes) —
+and verifies each one:
+
+| Check | Done when |
+| --- | --- |
+| `independent-review` | An MR note starting `### avflow — independent review` contains `Verdict: approve` |
+| `code-owner` | One of the area's owners (a user, or a member of an owner group) approved the MR |
+| `checklist:<text>` | The item is ticked in the avflow section of the MR description |
+| `plan-confirmation` | Happens in the session; listed, not checkable in CI |
+
+`[ci] gate = "report"` (the default during the pilot) only lists what is missing; `gate = "fail"` fails the job, and
+with *Pipelines must succeed* the merge is blocked. The job reads approvals, notes and the description through the
+GitLab API with **`AVFLOW_GITLAB_TOKEN`** (below); without it, those checks show as not verifiable. Works on GitLab Free
+and Premium; on Premium you can also turn on *Require approval from code owners*.
+
+Limits to know: the review note and the ticks cannot prove who wrote them (the human reviewer still looks), and a profile
+change in a merge request applies only after it is merged.
 
 ## Writing tickets avflow can work with
 
@@ -297,17 +324,26 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 In the new repository, run:
 
 ```bash
-avflow init
+avflow init                      # detects the stack; or: avflow init --stack dotnet,node
 ```
 
-It adds the team's standard files: `CLAUDE.md`, `docs/CONTEXT.md`, a first ADR, `CODEOWNERS`, the merge request template, `.gitattributes`, `.editorconfig`, and the GitLab CI jobs that scan the commits for secrets (gitleaks, the server-side backup of the guardrails), check `Refs #id` in merge request titles, and move merged tickets to *Ready for test*. Existing files are never overwritten (use `--force` to replace them); if the project already has a `.gitlab-ci.yml`, avflow tells you to add `include: - local: .gitlab-ci.avflow.yml` to it.
+It writes **`.avflow/project.toml`**, the project's risk profile, from **stack presets** (.NET, Node, Python, Java, Go —
+detected from `*.sln`, `package.json`, `pyproject.toml`, `pom.xml`, `go.mod`, …): areas for dependencies, data migrations,
+configuration, build and CI (including the profile itself and CODEOWNERS) and infrastructure; the stack's own risks as
+commented suggestions; a commented example for a domain area; `[risk.other]`; a strict default — plan confirmation and
+independent review for every change outside the areas — for the first **6 weeks**; and `[ci] gate = "report"`. The
+project owns this file: edit it, add its own areas (payments, machine control, …) and owners.
 
-Then fill in the TODOs in `CLAUDE.md` (build and test commands, sensitive paths) and `CODEOWNERS`, protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
+It also adds the team's standard files: `CLAUDE.md`, `docs/CONTEXT.md`, a first ADR, `CODEOWNERS`, the merge request template, `.gitattributes`, `.editorconfig`, and the GitLab CI jobs that scan the commits for secrets (gitleaks, the server-side backup of the guardrails), check `Refs #id` in merge request titles, move merged tickets to *Ready for test*, and check the risk areas' required checks (`avflow-risk-check`, with its
+scripts `ci/avflow_risk_check.py` and `ci/avflow_risk.py`). Existing files are never overwritten (use `--force` to replace them); if the project already has a `.gitlab-ci.yml`, avflow tells you to add `include: - local: .gitlab-ci.avflow.yml` to it.
+
+Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands), protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
 
 | Variable | Value |
 | --- | --- |
 | `REDMINE_URL` | The same Redmine address as in `avflow setup` |
-| `REDMINE_CI_API_KEY` | The API key of a **dedicated CI account** in Redmine (masked, protected) |
+| `REDMINE_CI_API_KEY` | The API key of a **dedicated CI account** in Redmine (masked, protected). Give it *View private notes* if CI should see the checks recorded at start and plan |
+| `AVFLOW_GITLAB_TOKEN` | A **project access token** (Settings → Access tokens; role Reporter, scope `read_api`; masked) — lets `avflow-risk-check` read approvals, notes and the description |
 
 **The CI account** is an ordinary Redmine user created only for CI (for example `ci-bot`), member of the project with the team role. Its notes show as written by CI, its key can be reset without affecting anyone, and CI keeps working when people change. Do not use a person's key in a real project: anyone with Maintainer access in GitLab can read CI variables. If there is no CI account yet, remove the `avflow-ready-for-test` job and move tickets to *Ready for test* by hand.
 
@@ -353,7 +389,8 @@ Superpowers is kept; remove it in Claude Code with `/plugin uninstall superpower
 | `avflow update --check` | Only tells you whether a new version exists |
 | `avflow config` | Shows the settings and which are yours (never the token); `--edit`, `--path`, `--reset` |
 | `avflow usage` | Context size per session and subagent calls with their models |
-| `avflow init` | Adds the team's standard files to a project repository |
+| `avflow init [--stack …]` | Adds the team's standard files and the risk profile to a project repository |
+| `avflow risk check` · `files` · `sync` · `suggest` | The project's risk profile: validate, try on files, regenerate CODEOWNERS and the CI copy, propose paths from gaps |
 | `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the referenced tickets |
 | `avflow report --project <id>` | Weekly PM report (read-only) |
 | `avflow uninstall` | Removes configuration, token, MCP server, plugin, skills, subagents and hooks |

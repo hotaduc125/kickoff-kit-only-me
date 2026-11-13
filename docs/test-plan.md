@@ -1,8 +1,8 @@
-<!-- Test plan for avflow 3.0 (phase 1: one flow, project-defined risk), written in Vietnamese for the PM. Keep it in step with behaviour. Phase 2 (CI gate, CODEOWNERS sync, presets in init) and phase 3 (sandbox profile, generic wording) will add to parts B and E. -->
+<!-- Test plan for avflow 3.0 (phase 1: one flow, project-defined risk; phase 2: CI gate avflow-risk-check, CODEOWNERS sync, stack presets in init, risk suggest), written in Vietnamese for the PM. Keep it in step with behaviour. Phase 3 (sandbox profile, generic wording) will add to parts 0 and B. -->
 
 # Kế hoạch kiểm thử avflow (end-to-end)
 
-Phiên bản áp dụng: **avflow 3.0 — giai đoạn 1** (một luồng cho mọi ticket, vùng rủi ro do dự án định nghĩa; chưa phát hành — ở các bước cài đặt, thay `2.6.2` bằng phiên bản đang thử) · Môi trường: Redmine của Enclave, GitLab của Enclave (có runner), macOS (Windows xem `WINDOWS_TEST.md`).
+Phiên bản áp dụng: **avflow 3.0 — giai đoạn 1 và 2** (một luồng cho mọi ticket, vùng rủi ro do dự án định nghĩa; job CI `avflow-risk-check`, CODEOWNERS sinh từ hồ sơ, preset theo stack trong `avflow init`; chưa phát hành — ở các bước cài đặt, thay `2.6.2` bằng phiên bản đang thử) · Môi trường: Redmine của Enclave, GitLab của Enclave (có runner), macOS (Windows xem `WINDOWS_TEST.md`).
 
 Mục tiêu: chạy avflow qua **một vòng đời phát triển thật** — từ cài đặt, khởi tạo dự án, làm ticket, CI, review, merge, phát hành, đến xử lý sự cố và báo cáo — và xác nhận **các quy tắc an toàn** thật sự chặn được những gì cần chặn.
 
@@ -98,6 +98,19 @@ Bỏ qua mục 0.1a bên dưới nếu dùng cách này.
    - **Protect variable** nghĩa là biến chỉ có trong pipeline của **nhánh được bảo vệ**. Job này chỉ chạy khi push vào `develop` (đã bảo vệ ở bước 2), nên đúng như mong muốn; pipeline của nhánh feature không cần và không thấy API key.
    - **Không có tài khoản `ci-bot`** (chưa có admin để tạo): tạm dùng **API key của chính bạn** cho buổi test, nhưng khi đó các ghi chú do CI viết sẽ đứng tên bạn, và key của bạn nằm trong GitLab. Sau khi test xong, **Reset** key của bạn trong Redmine và nhờ admin tạo `ci-bot` cho dự án thật.
    - Tên trạng thái **không cần** biến CI: `avflow init` ghi chúng từ cấu hình của team vào `.gitlab-ci.avflow.yml` (kiểm tra ở B1).
+
+   **Biến thứ ba — `AVFLOW_GITLAB_TOKEN`** (cho job `avflow-risk-check`, phần E7–E14): job cần đọc **approvals**, **note** và **mô tả** của MR qua API; `CI_JOB_TOKEN` không đọc được approvals.
+
+   1. Project → **Settings → Access tokens → Add new token**: tên `avflow-risk-check`, **Role: Reporter**, **Scope: `read_api`**, ngày hết hạn theo quy định của team → **Create** → copy token (chỉ hiện một lần).
+   2. **Settings → CI/CD → Variables → Add variable**: Key `AVFLOW_GITLAB_TOKEN`, Value là token vừa tạo, **Mask variable: Có**, **Protect variable: Không** — job chạy trong pipeline **MR của nhánh feature** (không được bảo vệ), biến protected sẽ không tới được job.
+
+   | Key | Value | Masked | Protected |
+   |---|---|---|---|
+   | `AVFLOW_GITLAB_TOKEN` | Project access token (Reporter, `read_api`) | **Có** | **Không** |
+
+   - **Đọc ticket trong pipeline MR:** job `avflow-risk-check` cũng đọc ticket ở tiêu đề MR (vùng rủi ro, các check đã ghi ở start/plan) bằng `REDMINE_URL` / `REDMINE_CI_API_KEY`. Hai biến này đang **Protected** nên **không có** trong pipeline MR: job khi đó ghi *"Ticket #… could not be read (REDMINE_URL / REDMINE_CI_API_KEY not set); only the diff counts for it."* Để thử E14, tạm **bỏ Protected** của hai biến trong buổi test (cân nhắc: key của `ci-bot` khi đó có trong mọi pipeline MR — vẫn được che trong log), rồi bật lại sau.
+   - **Tài khoản `ci-bot` xem được private note** (role có *View private notes*) thì job mới biết các check đã ghi ở bước *start* / *plan*; nếu không, job ghi chú *"No private [avflow] notes visible…"* (E14).
+   - **GitLab Premium** (nếu có): bật thêm **Settings → Merge requests → Approval rules → Code owner approval** trên `develop`. Trên GitLab Free, CODEOWNERS chỉ hiển thị chủ sở hữu; việc chặn do `avflow-risk-check` làm (E9, E11).
 5. **Integrations → Redmine** *(tuỳ chọn, nhưng nên có)*: giúp `#123` trong tiêu đề MR và commit **tự thành link** sang ticket Redmine. avflow vẫn chạy được nếu bỏ qua bước này.
 
    Vào **Settings → Integrations → Redmine**, bật **Active**, rồi điền:
@@ -115,34 +128,27 @@ Bỏ qua mục 0.1a bên dưới nếu dùng cách này.
 
 ### 0.2b Hồ sơ rủi ro của dự án — `.avflow/project.toml` (điều kiện cho phần C, D, E)
 
-Dự án mẫu **chưa có** file này (sẽ thêm ở giai đoạn 3; `avflow init` tạo nó ở giai đoạn 2). Cho đến lúc đó, **tự tạo** file `.avflow/project.toml` ở gốc repo `avflow-sandbox`, trên một nhánh feature, rồi merge vào `develop` qua MR **trước** khi chạy phần C:
+Từ giai đoạn 2, **`avflow init` tạo file này** (B1) từ preset của stack — dự án mẫu là Python nên có các vùng *Dependencies*, *Data migrations*, *Configuration*, *Build and CI*, *Infrastructure*, cùng `[risk.other]`, `[risk.default]` và `[ci] gate = "report"`. Sau B1, **chỉnh file đó** trên cùng nhánh feature như sau, rồi merge vào `develop` qua MR (B3) **trước** khi chạy phần C:
 
-```toml
-[project]
-name = "avflow-sandbox"
+1. Thêm hai vùng riêng của dự án (sau các vùng preset):
 
-[[risk.area]]
-name   = "Machine control"            # trùng machine_side_area của team: Machine-side = yes → vùng này
-paths  = ["src/sandbox/machine.py"]
-owners = ["@<tên GitLab của bạn>"]
-checks = ["plan-confirmation", "independent-review", "code-owner",
-          "checklist:Tested on the simulator by someone other than the author"]
+   ```toml
+   [[risk.area]]
+   name   = "Machine control"            # trùng machine_side_area của team: Machine-side = yes → vùng này
+   paths  = ["src/sandbox/machine.py"]
+   owners = ["@<tên GitLab của đồng nghiệp>"]   # không phải tác giả MR: GitLab có thể cấm tự duyệt (E9)
+   checks = ["plan-confirmation", "independent-review", "code-owner",
+             "checklist:Tested on the simulator by someone other than the author"]
 
-[[risk.area]]
-name   = "Build and CI"
-paths  = [".gitlab-ci.yml", ".gitlab-ci.avflow.yml", "ci/**"]
-owners = ["@<tên GitLab của bạn>"]
-checks = ["code-owner"]
+   [[risk.area]]
+   name   = "Payments"                   # vùng "theo mối quan tâm": chưa có đường dẫn, chỉ nhận qua ticket
+   checks = ["independent-review"]
+   ```
 
-[[risk.area]]
-name   = "Payments"                   # vùng "theo mối quan tâm": chưa có đường dẫn, chỉ nhận qua ticket
-checks = ["independent-review"]
-
-[risk.other]                          # lựa chọn "Other high risk" trên ticket
-checks = ["plan-confirmation", "independent-review"]
-```
-
-Kiểm tra: `avflow risk check` trong repo phải ✅ (test **B4**).
+2. Ở vùng preset **Build and CI**: bỏ dấu `#` của dòng `owners`, điền `["@<tên GitLab của bạn>"]`, và thêm `"code-owner"` vào `checks` (thành `["independent-review", "code-owner"]`).
+3. **Comment cả mục `[risk.default]`** (thêm `#` trước ba dòng): dự án mẫu đã có cấu trúc, và mặc định nghiêm sẽ làm mọi ticket không rủi ro (T1, T2) dừng chờ xác nhận — phần C cần chúng chạy thẳng. Mặc định nghiêm được thử riêng ở **B8**.
+4. Giữ `[ci] gate = "report"` cho phần C và D; **E11** đổi sang `"fail"`.
+5. `avflow risk sync` (cập nhật khối avflow trong `CODEOWNERS` theo owners mới) rồi `avflow risk check` → ✅ (test **B4**).
 
 ### 0.3 Máy của bạn
 
@@ -343,26 +349,33 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
 
 ## Phần B — Khởi tạo dự án và CI
 
-### B1. `avflow init`
+### B1. `avflow init` — nhận diện stack, hồ sơ rủi ro, job CI
 
 - **Các bước:** trong `avflow-sandbox` (nhánh feature mới), chạy `avflow init --project avflow-sandbox`.
-- **Kết quả mong đợi:** trong `.gitlab-ci.avflow.yml`, job `avflow-ready-for-test` có `AVFLOW_STATUS_IN_REVIEW: "In Code Review"` và `AVFLOW_STATUS_READY_FOR_TEST: "Ready for testing"`; tạo `CLAUDE.md`, `docs/CONTEXT.md`, `docs/adr/0001-…`, `CODEOWNERS`, `.gitattributes`, `.editorconfig`, `.gitlab/merge_request_templates/Default.md`, `.gitlab-ci.avflow.yml`, `ci/avflow_redmine_update.py`; nếu repo **đã có** `.gitlab-ci.yml`: dòng ➖ nhắc thêm `include: - local: .gitlab-ci.avflow.yml`.
+- **Kết quả mong đợi:**
+  - Dòng **`Stack presets: python`** (nhận ra từ `pyproject.toml`).
+  - Tạo `CLAUDE.md`, `docs/CONTEXT.md`, `docs/adr/0001-…`, `CODEOWNERS`, `.gitattributes`, `.editorconfig`, `.gitlab/merge_request_templates/Default.md`, `.gitlab-ci.avflow.yml`, `ci/avflow_redmine_update.py`, **`ci/avflow_risk_check.py`**, **`ci/avflow_risk.py`** (dòng đầu `# avflow <phiên bản> — copy of avflow's risk.py …`) và **`.avflow/project.toml`**; repo **đã có** `.gitlab-ci.yml` nên có dòng ➖ nhắc thêm `include: - local: .gitlab-ci.avflow.yml`.
+  - `.avflow/project.toml`: `[project]` có `presets = ["python"]`, `preset_version = 1`; `[ci] gate = "report"`; các vùng **Dependencies** (`pyproject.toml`, `requirements*.txt`, `uv.lock`, `poetry.lock` · `independent-review`), **Data migrations** (`**/migrations/**`, `alembic/versions/**` · `plan-confirmation`, `independent-review`, `checklist:Migration and rollback tested on a copy of the data`), **Configuration** (`**/settings*.py`, `.env*` · `independent-review`), **Build and CI** (có `.avflow/**`, `ci/avflow_*`, `CODEOWNERS` · `independent-review`), **Infrastructure** (`plan-confirmation`, `independent-review`); mỗi vùng có dòng `# owners = …` **đang comment**, `code-owner` chưa bật; ví dụ vùng *Payments* đang comment; `[risk.other]`; `[risk.default]` với `until` = **hôm nay + 6 tuần**.
+  - `CODEOWNERS`: phần chú thích đầu file và khối `# >>> avflow risk areas … # <<< avflow risk areas` với dòng *"No risk area has owners yet …"*; không còn dòng `TODO`.
+  - `.gitlab-ci.avflow.yml`: job `avflow-ready-for-test` có `AVFLOW_STATUS_IN_REVIEW: "In Code Review"` và `AVFLOW_STATUS_READY_FOR_TEST: "Ready for testing"`; job mới **`avflow-risk-check`** (stage `.post`, rule `merge_request_event` với `when: always`) có `GIT_DEPTH: "0"`, `AVFLOW_FIELD_RISK_AREA: "Risk area"`, `AVFLOW_FIELD_MACHINE_SIDE: "Machine-side"`, `AVFLOW_MACHINE_SIDE_AREA: "Machine control"`; không còn chỗ giữ chỗ `{…}`.
+  - Phần *Next* nhắc: xem lại vùng rủi ro và owners, `avflow risk check`, `avflow risk sync`, biến CI `REDMINE_URL`, `REDMINE_CI_API_KEY`, **`AVFLOW_GITLAB_TOKEN`**.
+- **Thử thêm — `--stack`:** trong một thư mục trống `mkdir /tmp/stacktest && cd /tmp/stacktest && avflow init --stack dotnet,node` → `Stack presets: dotnet, node`; vùng *Dependencies* gộp đường dẫn của cả hai (`**/*.csproj`, `package-lock.json`, …); các vùng gợi ý *Native interop*, *Installers*, *Schema*, *Build tooling* xuất hiện **dạng comment**. `avflow init --stack cobol` → ❌ *"Unknown stack: cobol (known: dotnet, go, java, node, python)"*, mã thoát 1. Dọn: `rm -rf /tmp/stacktest`.
 
 ### B2. Không ghi đè
 
-- **Các bước:** sửa một dòng trong `CLAUDE.md`, chạy lại `avflow init`.
-- **Kết quả mong đợi:** `➖ kept existing CLAUDE.md`; nội dung bạn sửa còn nguyên.
+- **Các bước:** sửa một dòng trong `CLAUDE.md`, thêm một dòng tay `/docs/ @<bạn>` vào `CODEOWNERS` và đổi `name` trong `.avflow/project.toml`; chạy lại `avflow init`.
+- **Kết quả mong đợi:** `➖ kept existing CLAUDE.md`, `➖ kept existing CODEOWNERS`, `➖ kept existing .avflow/project.toml`, `➖ kept existing ci/avflow_risk.py`; nội dung bạn sửa còn nguyên. (`avflow init --force` mới ghi đè — **không** chạy ở đây.) Bỏ các thay đổi thử: `git checkout -- CLAUDE.md CODEOWNERS .avflow/project.toml`.
 
 ### B3. Hoàn tất CI cho repo
 
-- **Các bước:** điền build/test thật vào `.gitlab-ci.yml` (giữ `include`), điền TODO trong `CLAUDE.md` (lệnh build, test); thêm `.avflow/project.toml` theo mục 0.2b; commit, push nhánh, mở MR tiêu đề có `Refs #<T1>`; merge sau khi xanh.
-- **Kết quả mong đợi:** pipeline MR có job **avflow-mr-title**, **avflow-secret-scan** và các job build/test của bạn, tất cả xanh; job **avflow-ready-for-test** chạy sau khi merge vào develop.
+- **Các bước:** điền build/test thật vào `.gitlab-ci.yml` (giữ `include`), điền TODO trong `CLAUDE.md` (lệnh build, test); chỉnh `.avflow/project.toml` theo mục 0.2b và `avflow risk sync`; commit, push nhánh, mở MR tiêu đề có `Refs #<T1>`; merge sau khi xanh.
+- **Kết quả mong đợi:** pipeline MR có job **avflow-mr-title**, **avflow-secret-scan**, các job build/test của bạn và **avflow-risk-check**, tất cả xanh. Log của `avflow-risk-check`: *"no .avflow/project.toml on develop — nothing to check"* (hồ sơ chưa có trên nhánh đích: job **luôn** đọc hồ sơ của nhánh đích, xem E12). Job **avflow-ready-for-test** chạy sau khi merge vào develop.
 
 ### B4. `avflow risk check` và `avflow risk files`
 
 - **Các bước:** trong repo `avflow-sandbox` (đã có file ở 0.2b): `avflow risk check`; `avflow risk files src/sandbox/machine.py src/sandbox/report.py`; `avflow risk files src/sandbox/orders.py --area "Other high risk"`; `avflow risk files src/sandbox/report.py`.
 - **Kết quả mong đợi:**
-  - `check`: `✅ .avflow/project.toml: 3 risk areas`, mỗi vùng kèm checks, owners, paths; dòng *Payments* ghi *"no paths yet — recognised only when a ticket names it"*; dòng *Other high risk (ticket)*; mã thoát 0.
+  - `check`: `✅ .avflow/project.toml: 7 risk areas (avflow-sandbox)` (5 vùng preset + Machine control + Payments), mỗi vùng kèm checks, owners, paths; **không** có cảnh báo ⚠️ (CODEOWNERS và `ci/avflow_risk.py` đã khớp); dòng *Payments* ghi *"no paths yet — recognised only when a ticket names it"*; dòng *Other high risk (ticket)*; mã thoát 0.
   - `files` lần 1: *Risk areas: Machine control (files)*, liệt kê `src/sandbox/machine.py`, các check của vùng (Plan confirmation, Independent review, Code owner approval, Checklist …).
   - `files --area "Other high risk"`: *Other high risk (ticket)*, Plan confirmation + Independent review, và **Profile gaps** liệt kê `src/sandbox/orders.py`.
   - `files` lần cuối: *Required checks: none — standard flow*.
@@ -371,6 +384,26 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
 
 - **Các bước:** trên một nhánh thử, sửa `.avflow/project.toml`: đổi một check thành `"telepathy"` và xoá `owners` của *Build and CI*; chạy `avflow risk check`; rồi trong Claude Code (đang ở nhánh đó) *"Start ticket <T1>."*
 - **Kết quả mong đợi:** `risk check` in ❌ *"unknown check 'telepathy'"* và ❌ *"'code-owner' needs owners"*, mã thoát **1**; `start_ticket` **bị từ chối** với *".avflow/project.toml has problems — fix it (run `avflow risk check`)"*; T1 **vẫn Ready**. Dọn: khôi phục file (`git checkout -- .avflow/project.toml`).
+
+### B6. `avflow risk sync` — CODEOWNERS và bản sao cho CI
+
+- **Các bước:** trên nhánh thử: thêm một dòng tay `/docs/ @<bạn>` **ngoài** khối avflow của `CODEOWNERS`; trong `.avflow/project.toml` thêm một owner thứ hai cho *Machine control*; `avflow risk check`; `avflow risk sync`; chạy `avflow risk sync` lần nữa; `git diff CODEOWNERS`.
+- **Kết quả mong đợi:**
+  - `risk check` (trước sync): ⚠️ *"CODEOWNERS is out of date with the profile — run `avflow risk sync`."*, mã thoát vẫn 0.
+  - `risk sync`: `✅ CODEOWNERS updated from the profile`; trong khối avflow có `# Machine control` và `/src/sandbox/machine.py @<owner 1> @<owner 2>`, `# Build and CI` với các đường dẫn bắt đầu bằng `/` (ví dụ `/.avflow/** @<bạn>`); vùng không có owners **không** xuất hiện; dòng `/docs/ @<bạn>` ngoài khối **còn nguyên**; chỉ có **một** khối avflow.
+  - Lần sync thứ hai: `✅ CODEOWNERS already up to date` (không đổi gì).
+  - `ci/avflow_risk.py`: sửa tay một ký tự trong file → `avflow risk check` báo ⚠️ *"ci/avflow_risk.py is out of date with this avflow — run `avflow risk sync`."*; `avflow risk sync` → `✅ ci/avflow_risk.py refreshed for the CI job`; check lại không còn cảnh báo.
+- Dọn: bỏ nhánh thử.
+
+### B7. Preset mới hơn có thêm đường dẫn (preset drift)
+
+- **Các bước:** trên nhánh thử, trong `.avflow/project.toml`: đổi `preset_version = 1` thành `preset_version = 0` và xoá `"uv.lock"` khỏi `paths` của *Dependencies*; `avflow risk check`.
+- **Kết quả mong đợi:** ⚠️ *"A newer stack preset adds paths to 'Dependencies': uv.lock — add them by merge request if they apply."* (avflow **không** tự sửa hồ sơ). Đặt lại `preset_version = 1` → không còn cảnh báo dù `uv.lock` vẫn thiếu (cảnh báo chỉ xuất hiện khi preset có phiên bản mới hơn hồ sơ). Dọn: bỏ nhánh thử.
+
+### B8. Mặc định nghiêm cho dự án mới (`[risk.default]`)
+
+- **Các bước:** trên nhánh thử, bỏ comment `[risk.default]` (0.2b bước 3) với `until` là một ngày **trong tương lai**; `avflow risk files src/sandbox/report.py`; `avflow risk files src/sandbox/machine.py`; rồi đổi `until = "2020-01-01"`; `avflow risk check`; `avflow risk files src/sandbox/report.py`.
+- **Kết quả mong đợi:** `report.py`: *"(strict default [risk.default] applies: no area matched)"*, Plan confirmation + Independent review; `machine.py`: **không** áp mặc định (đã có vùng khớp). Sau khi đổi ngày: `risk check` in *"Strict default ended on 2020-01-01 — remove [risk.default] or move its date."*; `files src/sandbox/report.py` → *standard flow*. Dọn: bỏ nhánh thử.
 
 ---
 
@@ -406,8 +439,10 @@ Từ 3.0 không còn chế độ (DIRECT / PLAN / FULL / SPIKE) và không còn 
 - **Kết quả mong đợi:**
   - MR vào `develop`, tiêu đề có `Refs #<T2>`, dùng mẫu MR của team (mục *Required checks* thay cho *Mode*); agent **chờ pipeline** (`glab ci status`).
   - **Chỉ khi xanh**, agent gọi **`review_requirements`** với link MR: trên MR có comment *"### avflow — required checks"* (*Risk areas: none — standard flow* … *Computed from N changed files against origin/develop*); trên T2 có private note cùng nội dung, dòng đầu `[avflow] required {"stage": "review", …}`.
+  - Mô tả MR có thêm mục **`<!-- avflow:checks -->` … `### Required checks (avflow)` … `<!-- /avflow:checks -->`** với *"None beyond the standard flow …"*; kết quả `review_requirements` có `mr_checklist: updated`. Phần mô tả viết trước đó **còn nguyên**.
+  - Job **avflow-risk-check** của MR xanh, log có `gate: report · profile from develop`, *"Risk areas: none — standard flow"* và *"✅ No extra checks: standard flow."*
   - Sau đó mới gọi `submit_for_review` → T2 **In review**, private note có link MR. Trong GitLab, `#<T2>` là link sang Redmine.
-  - *Nếu `glab` chưa đăng nhập:* `review_requirements` vẫn ghi note trên ticket và trả `mr_note: not posted: …`; agent báo bạn để chép danh sách vào MR.
+  - *Nếu `glab` chưa đăng nhập:* `review_requirements` vẫn ghi note trên ticket và trả `mr_note: not posted: …` và `mr_checklist: not updated: …`; agent báo bạn để chép danh sách vào MR.
 
 ### C6. Merge và cập nhật trạng thái tự động
 
@@ -520,7 +555,7 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 ### E2. Review hai vòng bằng subagent riêng
 
 - **Các bước:** đi hết T3 đến lúc review.
-- **Kết quả mong đợi:** vì danh sách có **`independent-review`**, thấy lần gọi **`avflow-reviewer`** **sau** implementer (skill `qa-agent`, mục E); kết quả theo *Stage 1 (spec) / Stage 2 (code quality)*, phân loại Blocking / Should fix / Note, được đăng thành private note và comment trên MR. Reviewer **không sửa file**.
+- **Kết quả mong đợi:** vì danh sách có **`independent-review`**, thấy lần gọi **`avflow-reviewer`** **sau** implementer (skill `qa-agent`, mục E); kết quả theo *Stage 1 (spec) / Stage 2 (code quality)*, phân loại Blocking / Should fix / Note, được đăng thành private note và comment trên MR. Agent đăng thêm **một note trên MR** đúng dạng `### avflow — independent review` / `Stage 1 (spec): pass` / `Stage 2 (code quality): pass` / … / `Verdict: approve` (chỉ `approve` khi cả hai vòng đạt và không có Blocking; nếu không thì `Verdict: changes requested`). Reviewer **không sửa file**.
 
 ### E3. Nới lỏng test bị bắt
 
@@ -535,13 +570,62 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 ### E5. Diff chạm vùng không có trong kế hoạch → kiểm tra chỉ tăng
 
 - **Các bước:** làm T2 như phần C (kế hoạch không có vùng nào, quyết định continue); trước khi mở MR, **tự tay** thêm một dòng vào `.gitlab-ci.yml` trên cùng nhánh, commit, push; chờ pipeline xanh; để agent gọi `review_requirements`.
-- **Kết quả mong đợi:** kết quả có `risk_areas: {"Build and CI": "review"}`, `missed_at_plan: ["Build and CI"]`, `added_at_review: ["code-owner"]`; comment trên MR có dòng *"Found only in the diff (not in the ticket or the plan): Build and CI"*.
+- **Kết quả mong đợi:** kết quả có `risk_areas: {"Build and CI": "review"}`, `missed_at_plan: ["Build and CI"]`, `added_at_review: ["independent-review", "code-owner"]` (check của vùng *Build and CI* sau 0.2b); comment trên MR có dòng *"Found only in the diff (not in the ticket or the plan): Build and CI"*.
 - **Thử thêm (chỉ tăng):** với T3 (kế hoạch đã yêu cầu 4 check ở E1), bỏ thay đổi ở `src/sandbox/machine.py` khỏi diff trước khi review → `review_requirements` **vẫn** trả đủ 4 check của Machine control (`added_at_review: []`): check đã bắt buộc ở kế hoạch không mất đi khi diff không còn chạm vùng đó.
 
 ### E6. Khoảng trống của hồ sơ rủi ro (profile gaps)
 
 - **Các bước:** trong T3, ngoài `src/sandbox/machine.py`, sửa thêm `src/sandbox/orders.py` (không thuộc vùng nào); MR xanh; `review_requirements`.
 - **Kết quả mong đợi:** `profile_gaps: ["src/sandbox/orders.py"]`; comment trên MR và note trên ticket có mục *"Profile gaps — files of this high-risk ticket outside every risk area (consider adding them to .avflow/project.toml)"*. Ticket **không** rủi ro (ví dụ T2) không bao giờ có profile gaps.
+
+### Job CI `avflow-risk-check` (E7–E14)
+
+Điều kiện: hồ sơ ở 0.2b **đã merge vào `develop`**; biến `AVFLOW_GITLAB_TOKEN` đã thêm (0.2 bước 4); `owners` của *Machine control* là một **đồng nghiệp** (hoặc một group GitLab có đồng nghiệp trong đó). Dùng MR của T3 (sửa `src/sandbox/machine.py`). Kết quả xem trong **log của job** (CI/CD → Jobs → `avflow-risk-check`).
+
+### E7. Chế độ report: liệt kê check còn thiếu, pipeline vẫn xanh
+
+- **Các bước:** MR của T3 xanh, **trước** khi có approval và trước khi tick checklist.
+- **Kết quả mong đợi:** log có `gate: report · profile from develop · N changed files · tickets: #<T3>`, *"Risk areas: Machine control (…)"*, ⚠️ *Plan confirmation: confirmed by the assignee in the session — not visible to CI …*, ❌ *Code owner approval: Machine control: needs an approval from @<owner> (re-run this job after approving)*, ❌ *Checklist …: tick '- [x] Tested on the simulator by someone other than the author' in the avflow section of the MR description* (và ❌ Independent review nếu E2 chưa xong); dòng cuối *"… required check(s) missing or not verifiable (gate = report: not blocking)."*; job **xanh**, pipeline **xanh**.
+
+### E8. Checklist trong mô tả MR — chỉ tick trong mục avflow mới tính
+
+- **Các bước:** (1) mở mô tả MR của T3: mục `<!-- avflow:checks -->` do `review_requirements` viết. (2) Thêm **ngoài** mục avflow một dòng `- [x] Tested on the simulator by someone other than the author`, lưu, **chạy lại job**. (3) Tick ô **trong** mục avflow, chạy lại job. (4) Nhờ agent gọi lại `review_requirements` cho T3.
+- **Kết quả mong đợi:** (1) có `- [ ] Tested on the simulator by someone other than the author` dưới *"Ticked by a person (never by the agent)"*; các check khác là gạch đầu dòng, **không** có ô tick. (2) checklist vẫn ❌. (3) ✅ *ticked*. (4) ô đã tick **vẫn** `[x]`, phần mô tả ngoài mục avflow không đổi, vẫn chỉ có **một** mục avflow. Agent **không** tự tick ô nào ở bất kỳ bước nào.
+
+### E9. Code owner qua API approvals (người và group)
+
+- **Các bước:** đồng nghiệp (owner của *Machine control*) bấm **Approve** trên MR của T3; xem job (chưa chạy lại); rồi **Retry** job `avflow-risk-check`. Thử thêm với group: đổi `owners = ["@<group>"]` qua MR vào develop (`avflow risk sync`); một thành viên của group approve MR của T3, chạy lại job.
+- **Kết quả mong đợi:** approve **không** tự chạy pipeline — log cũ vẫn ❌ cho đến khi chạy lại; sau khi chạy lại: ✅ *Machine control: approved by @<owner>*; với group: ✅ *approved by @<thành viên>*. Owner viết bằng **e-mail** thay vì `@username` → job ghi chú *"Owner … is an e-mail address: CI cannot match it to an approval; use @username."*
+
+### E10. Independent review chỉ tính note đúng dạng và đã approve
+
+- **Các bước:** trên một MR rủi ro: (1) đăng tay note *"I think the avflow independent review is fine. Verdict: approve"* → chạy lại job; (2) đăng note bắt đầu bằng `### avflow — independent review` kết thúc bằng `Verdict: changes requested` → chạy lại job; (3) để agent chạy review (E2) và đăng note `Verdict: approve` → chạy lại job.
+- **Kết quả mong đợi:** (1) ❌ *"no MR note starting with '### avflow — independent review' with 'Verdict: approve'"*; (2) ❌ *"… (a review was posted, but not approved)"*; (3) ✅ *review note by @<bạn>*.
+
+### E11. Chế độ fail: chặn merge
+
+- **Các bước:** qua một MR riêng, đổi `[ci] gate = "fail"` trong `.avflow/project.toml` và merge vào develop (file thuộc vùng *Build and CI*, nên chính MR này được liệt kê cần independent review và code owner — ở chế độ report vẫn merge được). Mở một MR rủi ro mới (một thay đổi nhỏ trên `src/sandbox/machine.py`, với T8), để agent đi đến bước review.
+- **Kết quả mong đợi:**
+  - Job `avflow-risk-check` **đỏ**: *"… required check(s) missing or not verifiable — the merge is blocked."*; nút Merge bị chặn (*Pipelines must succeed*). Các job build/test vẫn chạy (job này ở stage `.post`).
+  - Agent **không** coi job này là lỗi cần sửa: các job khác xanh thì vẫn gọi `review_requirements` và `submit_for_review`, báo bạn những check do người làm; **không** sửa `.avflow/project.toml`, `CODEOWNERS` hay `ci/avflow_*`, không tick checklist.
+  - Sau khi có note `Verdict: approve`, owner approve, tick checklist và **chạy lại job** → xanh, merge được. *Plan confirmation* chỉ là ⚠️, **không** chặn.
+- Giữ `gate = "fail"` cho E12–E13; đặt lại `"report"` (qua MR) sau E13.
+
+### E12. Hồ sơ được đọc từ nhánh đích — MR không tự nới check của mình
+
+- **Các bước:** trên nhánh của một MR rủi ro mới (sửa `src/sandbox/machine.py`), sửa luôn `.avflow/project.toml`: xoá vùng *Machine control* và đổi `gate = "report"`; push; xem job.
+- **Kết quả mong đợi:** log có *"Note: this MR changes .avflow/project.toml; the new profile applies after the merge."*; vẫn `gate: fail · profile from develop`, vẫn yêu cầu đủ check của *Machine control*, job **đỏ** (MR này chạm *Build and CI* nên còn cần thêm check của vùng đó).
+
+### E13. Thiếu `AVFLOW_GITLAB_TOKEN` → không kiểm tra được
+
+- **Các bước:** tạm đổi Key `AVFLOW_GITLAB_TOKEN` thành `AVFLOW_GITLAB_TOKEN_OFF` (Settings → CI/CD → Variables); chạy lại job trên MR rủi ro (gate = fail); rồi đổi lại tên và chạy lại.
+- **Kết quả mong đợi:** ⚠️ *"cannot read MR notes: AVFLOW_GITLAB_TOKEN is not set"*, ⚠️ *"cannot read approvals: AVFLOW_GITLAB_TOKEN is not set"*; checklist vẫn đọc được từ biến có sẵn `CI_MERGE_REQUEST_DESCRIPTION` (✅ nếu đã tick); với `gate = "fail"`: job **đỏ** (*missing or not verifiable*) — thiếu token thì chặn chứ không cho qua. Đổi lại tên → như E11.
+
+### E14. Job đọc ticket từ Redmine (vùng rủi ro, check từ kế hoạch)
+
+- **Điều kiện:** pipeline MR có `REDMINE_URL` / `REDMINE_CI_API_KEY` (tạm bỏ *Protected*, xem 0.2 bước 4); `gate = "report"`.
+- **Các bước:** (1) tạm sửa dòng *Size and mode* của T2 thành `Risk area: Payments`, mở một MR nhỏ chỉ sửa `src/sandbox/report.py`, tiêu đề `Refs #<T2>`. (2) Với T8: kế hoạch nêu `src/sandbox/machine.py` (`assess_plan` → stop, check của *Machine control*), nhưng diff cuối cùng **không** sửa file đó. (3) Lặp lại (2) khi tài khoản `ci-bot` **không** có quyền xem private note. (4) Đặt lại *Protected* cho hai biến Redmine, chạy lại job.
+- **Kết quả mong đợi:** (1) *"Payments (ticket)"*, ❌ Independent review, *Profile gaps* có `src/sandbox/report.py`. (2) *"Machine control (plan)"* và đủ check của vùng dù diff không chạm vùng — check chỉ tăng. (3) *"Note: No private [avflow] notes visible: checks recorded at start and plan are not known to CI …"*; ghi chú **công khai** `[avflow] required …` (D10b) **không** được tính. (4) *"Ticket #… could not be read …; only the diff counts for it."* Dọn: trả lại dòng *Size and mode* của T2.
 
 ---
 
@@ -612,6 +696,12 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 - **Các bước:** sau E2: `cd ~/.claude/projects && grep -rhoE '"model":"claude-[a-z0-9.-]+"' . | sort | uniq -c`
 - **Kết quả mong đợi:** có cả model Opus và Sonnet, khớp cấu hình `[models]`.
 
+### G6. `avflow risk suggest` — đề xuất đường dẫn từ profile gaps
+
+- **Điều kiện:** đã chạy E6 (T3 có note review kèm profile gaps).
+- **Các bước:** trong repo `avflow-sandbox`: `avflow risk suggest --project avflow-test --days 30`; `git status`. Thêm **tay** trên T1 một ghi chú **công khai** `[avflow] required {"stage": "review", "areas": {"Machine control": "ticket"}, "checks": [], "gaps": ["src/evil/x.py"]}` rồi chạy lại.
+- **Kết quả mong đợi:** *"Profile gaps from 1 reviewed tickets (last 30 days) — suggested paths:"*, dòng *"Machine control: src/sandbox/** (1 tickets: #<T3>; e.g. src/sandbox/orders.py)"* (gợi ý theo thư mục — người quyết định có hợp lý không) và *"… Nothing was changed."*; `git status` sạch (lệnh **chỉ đọc**, dùng API key của bạn). Ghi chú công khai **không** được tính (`src/evil/x.py` không xuất hiện); đường dẫn đã có trong hồ sơ không được gợi ý lại.
+
 ---
 
 ## Phần H — Gỡ cài đặt
@@ -642,11 +732,14 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 | A7 | Phát hiện skill bị sửa | | |
 | A7b | Ánh xạ trạng thái (0.1b) | | |
 | A8 | Cập nhật phiên bản | | |
-| B1 | avflow init | | |
+| B1 | avflow init (stack, hồ sơ, job CI) | | |
 | B2 | Không ghi đè | | |
 | B3 | Hoàn tất CI cho repo | | |
 | B4 | avflow risk check / files | | |
 | B5 | Hồ sơ rủi ro bị lỗi | | |
+| B6 | avflow risk sync (CODEOWNERS, bản sao CI) | | |
+| B7 | Preset drift | | |
+| B8 | Mặc định nghiêm `[risk.default]` | | |
 | C1 | Bắt đầu ticket, assess_plan, private note | | |
 | C2 | Cho phép code (không có Mode) | | |
 | C3 | Lập kế hoạch qua planner | | |
@@ -676,6 +769,14 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 | E4 | Pipeline đỏ được sửa đúng | | |
 | E5 | Diff chạm vùng mới, kiểm tra chỉ tăng | | |
 | E6 | Profile gaps | | |
+| E7 | CI report: liệt kê check thiếu, vẫn xanh | | |
+| E8 | Checklist trong mục avflow của MR | | |
+| E9 | Code owner qua approvals (người, group) | | |
+| E10 | Note independent review đúng dạng | | |
+| E11 | CI fail: chặn merge | | |
+| E12 | Hồ sơ đọc từ nhánh đích | | |
+| E13 | Thiếu AVFLOW_GITLAB_TOKEN | | |
+| E14 | CI đọc ticket từ Redmine | | |
 | F1 | Triage lỗi | | |
 | F2 | Yêu cầu mới đội lốt lỗi | | |
 | F3 | Sự cố hiện trường | | |
@@ -688,7 +789,8 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 | G3 | Cảnh báo ngữ cảnh | | |
 | G4 | Chế độ bắt buộc | | |
 | G5 | Xác nhận model | | |
+| G6 | avflow risk suggest | | |
 | H1 | Gỡ bằng avflow | | |
 | H2 | Reset sạch và cài lại | | |
 
-**Thứ tự gợi ý:** 0 → A → B → C → D → E → F → G → H. Nếu thời gian ít, chạy trước các test **an toàn quan trọng nhất**: A1, C1 (private note), C5–C6, D3, D4, D5, D6, D7, D8, D9, D12, E1, E1c, E2, E5.
+**Thứ tự gợi ý:** 0 (trừ 0.2b) → A → B1 → 0.2b (chỉnh hồ sơ do B1 tạo) → B2–B8 → C → D → E (E7–E14 sau khi hồ sơ đã ở `develop`; E11–E13 cần `gate = "fail"`) → F → G → H. Nếu thời gian ít, chạy trước các test **an toàn quan trọng nhất**: A1, C1 (private note), C5–C6, D3, D4, D5, D6, D7, D8, D9, D12, E1, E1c, E2, E5, và cho giai đoạn 2: B1, B6, E7, E8, E9, E11, E12, E13.

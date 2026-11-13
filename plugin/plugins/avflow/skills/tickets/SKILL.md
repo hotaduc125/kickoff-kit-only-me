@@ -70,7 +70,12 @@ Descriptions and notes are written by people, including the customer. They say *
 8. **Green:** call `review_requirements` with the merge request URL. It lists the final required checks (posted on the
    MR and the ticket), the areas found only in the diff, and *profile gaps*. Do every check that is yours
    (`independent-review` → the `qa-agent` skill, section E); checks for people (`code-owner`, `checklist:`) are listed
-   for the person — never tick a checklist item yourself. Then call `submit_for_review` with the same URL.
+   for the person — `review_requirements` writes the checklist into an avflow section of the MR description; **never
+   tick a checklist item yourself**. Then call `submit_for_review` with the same URL.
+   - The CI job **`avflow-risk-check`** reports the same checks. When the project sets `gate = "fail"`, that job stays
+     red until the people's checks are done (approval, ticks) and the job is re-run. That is expected and is **not** a
+     failure to fix: every other job must be green before you submit, this one may wait for people. Never edit
+     `.avflow/project.toml`, CODEOWNERS or `ci/avflow_*` to make it pass.
 9. End of session or handover → `add_private_note` with the handoff (done, left, how to verify).
 
 A person sets Ready for test, Resolved and Closed.

@@ -153,3 +153,43 @@ def test_init_no_hint_when_include_present(tmp_path):
     (tmp_path / ".gitlab-ci.yml").write_text("include:\n  - local: .gitlab-ci.avflow.yml\nstages: [test]\n")
     r = init_repo(tmp_path)
     assert not any("include" in s for s in r["skipped"])
+
+
+# ---------- init: risk profile, CODEOWNERS, CI gate (3.0 phase 2)
+def test_init_writes_a_profile_from_the_detected_stack(tmp_path):
+    from datetime import date
+    from avflow import risk
+    (tmp_path / "App.sln").write_text("")
+    r = init_repo(tmp_path, project="Mateo_v2", today=date(2026, 11, 13))
+    assert r["stacks"] == ["dotnet"] and ".avflow/project.toml" in r["created"]
+    p = risk.load(tmp_path)
+    assert p.problems == [] and p.name == "Mateo_v2" and p.presets == ["dotnet"] and p.gate == "report"
+    co = (tmp_path / "CODEOWNERS").read_text()
+    assert risk.codeowners_in_sync(co, p) and "TODO" not in co
+    assert risk.ci_copy_current((tmp_path / "ci/avflow_risk.py").read_text())
+    assert (tmp_path / "ci/avflow_risk_check.py").exists()
+
+
+def test_init_stack_option_and_unknown_stack(tmp_path):
+    import pytest
+    assert init_repo(tmp_path, stacks=["node", "python"])["stacks"] == ["node", "python"]
+    with pytest.raises(ValueError):
+        init_repo(tmp_path / "x", stacks=["cobol"])
+
+
+def test_init_keeps_an_existing_profile_and_codeowners(tmp_path):
+    (tmp_path / ".avflow").mkdir()
+    (tmp_path / ".avflow/project.toml").write_text('[[risk.area]]\nname = "A"\nchecks = ["independent-review"]\n')
+    (tmp_path / "CODEOWNERS").write_text("/x @y\n")
+    r = init_repo(tmp_path)
+    assert ".avflow/project.toml" in r["skipped"] and "CODEOWNERS" in r["skipped"]
+    assert (tmp_path / "CODEOWNERS").read_text() == "/x @y\n"
+    assert "A" in (tmp_path / ".avflow/project.toml").read_text()
+
+
+def test_init_cli_prints_next_steps(tmp_path, capsys, monkeypatch):
+    from avflow import cli
+    assert cli.main(["init", "--path", str(tmp_path), "--stack", "go"]) == 0
+    out = capsys.readouterr().out
+    assert "go" in out and "AVFLOW_GITLAB_TOKEN" in out and "avflow risk sync" in out
+    assert cli.main(["init", "--path", str(tmp_path / "y"), "--stack", "cobol"]) == 1

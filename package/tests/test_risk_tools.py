@@ -180,3 +180,20 @@ def test_reason_cannot_smuggle_a_marker_line(tmp_path):
     assert len(last_note(fake)["notes"].splitlines()) == 2
     with pytest.raises(ToolError):
         t.submit_for_review(1, MR)
+
+
+def test_review_writes_the_checklist_into_the_mr_and_keeps_ticks(tmp_path):
+    repo = FakeRepo(files=["source/Zmotion/Z.cs"])
+    repo.description = "## What and why\nRefs #1"
+    t, _, _ = make(tmp_path, [issue(1, status="In progress")], repo)
+    r = t.review_requirements(1, MR)
+    assert r["mr_checklist"] == "updated" and "- [ ] Tested on the test bench" in repo.description
+    repo.description = repo.description.replace("- [ ]", "- [x]")
+    t.review_requirements(1, MR)
+    assert "- [x] Tested on the test bench" in repo.description and repo.description.startswith("## What and why")
+
+
+def test_checklist_failure_is_reported_not_fatal(tmp_path):
+    repo = FakeRepo(files=["a"], post_error="glab: 403")
+    t, _, _ = make(tmp_path, [issue(1, status="In progress")], repo)
+    assert t.review_requirements(1, MR)["mr_checklist"].startswith("not updated")

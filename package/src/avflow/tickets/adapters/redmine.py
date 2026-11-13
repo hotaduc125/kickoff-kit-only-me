@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from ... import risk
 from .base import AdapterError, Ticket
 
 
@@ -72,58 +73,19 @@ class RedmineAdapter:
     # Machine-side and Hotspot from the "Size and mode" line of the description, written by the person. The agent never
     # writes the description or the risk-area field: it adds a risk area (and sets Hotspot without a field) in private
     # notes starting with MARKER. Risk areas are a union: nothing the agent writes can remove one.
-    MARKER = "[avflow]"
-    OTHER = "Other high risk"
+    MARKER = risk.MARKER
+    OTHER = risk.OTHER
 
     def _has_cf(self, issue: dict, name: str) -> bool:
         return self._cf(issue, name) is not None
 
     @staticmethod
-    def _split_areas(v) -> list[str]:
-        vals = v if isinstance(v, list) else re.split(r"\s*,\s*", str(v or ""))
-        return [x.strip() for x in vals if x and x.strip() and x.strip().lower() not in ("none", "no", "-", "n/a")]
-
-    @classmethod
-    def _desc_fields(cls, description: str) -> dict:
-        d = description or ""
-        out = {}
-        m = re.search(r"(?im)machine[- ]side\s*:\s*\**\s*(yes|no)\b", d)
-        if m:
-            out["machine_side"] = m.group(1).lower() == "yes"
-        m = re.search(r"(?im)hotspot\s*:\s*\**\s*`?([^`\n·|*]+?)`?\s*\**\s*(?:[·|]|$)", d)
-        if m:
-            v = m.group(1).strip()
-            out["hotspot"] = None if v.lower() in ("none", "-", "n/a", "") or v.lower().startswith("todo") else v
-        m = re.search(r"(?im)risk[ -]area\s*:\s*\**\s*([^\n·|*]*?)\s*\**\s*(?:[·|]|$)", d)
-        if m:
-            out["risk_areas"] = cls._split_areas(m.group(1))
-        m = re.search(r"(?im)high[ -]risk\s*:\s*\**\s*(yes|no)\b", d)
-        if m:
-            out["risk_areas"] = out.get("risk_areas", []) + ([cls.OTHER] if m.group(1).lower() == "yes" else [])
-        if re.search(r"(?im)\btype\s*:\s*\**\s*spike\b", d):
-            out["spike"] = True
-        return out
+    def _desc_fields(description: str) -> dict:
+        return risk.description_fields(description)
 
     @classmethod
     def _marker_fields(cls, journals: list[dict]) -> dict:
-        """Values from private notes like '[avflow] risk-area=Machine_control · hotspot=src/a.cs'.
-
-        Risk areas accumulate over all notes; for hotspot the latest wins. A 2.x 'machine-side=yes' still counts.
-        """
-        out: dict = {"risk_areas": []}
-        for j in journals or []:
-            text = j.get("notes") or ""
-            if not j.get("private_notes") or cls.MARKER not in text:
-                continue
-            line = next((l for l in text.splitlines() if l.strip().startswith(cls.MARKER)), "")
-            for k, v in re.findall(r"(risk-area|machine-side|hotspot)=([^·\s]+)", line):
-                if k == "risk-area":
-                    out["risk_areas"].append(v.replace("_", " "))
-                elif k == "machine-side":
-                    out["machine_side"] = out.get("machine_side") or v.lower() == "yes"
-                elif k == "hotspot":
-                    out["hotspot"] = None if v in ("none", "-") else v
-        return out
+        return risk.marker_fields([j.get("notes") or "" for j in journals or [] if j.get("private_notes")])
 
     def _fields(self, issue: dict) -> dict:
         cfg = self.cfg
@@ -132,7 +94,7 @@ class RedmineAdapter:
         has_hs_cf = self._has_cf(issue, cfg.field_hotspot)
         desc = self._desc_fields(issue.get("description") or "")
         notes = self._marker_fields(issue.get("journals") or [])
-        areas = self._split_areas((self._cf(issue, cfg.field_risk_area) or {}).get("value")) if has_area_cf \
+        areas = risk.split_areas((self._cf(issue, cfg.field_risk_area) or {}).get("value")) if has_area_cf \
             else list(desc.get("risk_areas", []))
         if has_ms_cf:
             ms = (self._cf(issue, cfg.field_machine_side) or {}).get("value") == "1"
@@ -141,12 +103,7 @@ class RedmineAdapter:
         if ms or notes.get("machine_side"):
             areas.append(cfg.machine_side_area or self.OTHER)
         areas += notes["risk_areas"]
-        seen, uniq = set(), []
-        for a in areas:
-            k = re.sub(r"[\s_]+", " ", a).strip().lower()
-            if k not in seen:
-                seen.add(k)
-                uniq.append(a)
+        uniq = risk.unique_areas(areas)
         if has_hs_cf:
             hotspot = (self._cf(issue, cfg.field_hotspot) or {}).get("value") or None
         else:

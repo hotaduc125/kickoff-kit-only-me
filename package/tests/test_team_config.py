@@ -104,7 +104,8 @@ def test_config_reset_drops_overrides(tmp_path, monkeypatch):
 
 
 ENCLAVE = {"tickets": {"status_ready": "New", "status_in_progress": "In Progress",
-                       "status_in_review": "In Code Review", "status_ready_for_test": "Ready for testing"}}
+                       "status_in_review": "In Code Review", "status_ready_for_test": "Ready for testing",
+                       "machine_side_area": "Machine control"}}
 
 
 def test_init_writes_team_status_names_into_ci(tmp_path):
@@ -114,6 +115,12 @@ def test_init_writes_team_status_names_into_ci(tmp_path):
     job = yaml.safe_load((tmp_path / ".gitlab-ci.avflow.yml").read_text())["avflow-ready-for-test"]
     assert job["variables"] == {"AVFLOW_STATUS_IN_REVIEW": "In Code Review", "AVFLOW_STATUS_READY_FOR_TEST": "Ready for testing"}
     assert "{status_" not in (tmp_path / ".gitlab-ci.avflow.yml").read_text()
+    gate = yaml.safe_load((tmp_path / ".gitlab-ci.avflow.yml").read_text())["avflow-risk-check"]
+    assert gate["variables"]["AVFLOW_MACHINE_SIDE_AREA"] == "Machine control"
+    assert gate["variables"]["AVFLOW_FIELD_RISK_AREA"] == "Risk area" and gate["variables"]["GIT_DEPTH"] == "0"
+    assert gate["rules"] == [{"if": '$CI_PIPELINE_SOURCE == "merge_request_event"', "when": "always"}]
+    text = (tmp_path / ".gitlab-ci.avflow.yml").read_text()
+    assert "{field_" not in text and "{machine_side_area}" not in text
 
 
 def test_status_plan_with_enclave_names():
