@@ -96,4 +96,4 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 - Before the pilot, still open: GitLab tier of gitlab.enclave.vn; the Redmine CI variables are *Protected* and do not
   reach MR pipelines from feature branches; whether WKKM can see GitLab (check names are posted on MRs).
 - Known gaps: no GitHub Actions CI for this repository yet (the root `.gitlab-ci.yml` is a leftover); Windows scripts
-  only partly tested (`docs/WINDOWS_TEST.md` still describes the pre-2.6 setup questions); `avflow report` not yet run against the real Redmine/GitLab.
+  only partly tested (`docs/WINDOWS_TEST.md` is current for 3.0 but not yet run on a Windows PC); `avflow report` not yet run against the real Redmine/GitLab.
