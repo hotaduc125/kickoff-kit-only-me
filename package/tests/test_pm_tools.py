@@ -52,12 +52,14 @@ def test_commits_in_range_parses_refs():
 
 def test_build_release_notes_with_warnings():
     commits = [{"sha": "a1", "subject": "x", "ids": [12]}, {"sha": "c3", "subject": "Update readme", "ids": []}]
-    tickets = {12: {"id": 12, "subject": "Reset dialog", "type": "Task", "status": "Ready for test", "machine_side": True},
-               15: {"id": 15, "subject": "Parts page", "type": "Task", "status": "In progress", "machine_side": False}}
+    tickets = {12: {"id": 12, "subject": "Reset dialog", "type": "Task", "status": "Ready for test",
+                    "risk_areas": ["Machine control", "Build and CI"]},
+               15: {"id": 15, "subject": "Parts page", "type": "Task", "status": "In progress", "risk_areas": []}}
     text = rn.build(commits, tickets, ["Ready for test", "Resolved", "Closed"], "v1.0", "HEAD")
-    assert "#12 Reset dialog **[machine-side]**" in text
+    assert "#12 Reset dialog **[Machine control]** **[Build and CI]**" in text
     assert "`c3` has no ticket reference" in text and "#15 is 'In progress'" in text
-    assert "test bench" in text
+    assert "High-risk changes (Build and CI, Machine control)" in text
+    assert "machine-side" not in text.lower()
     assert text.index("#12 Reset dialog") < text.index("#15 Parts page")
 
 

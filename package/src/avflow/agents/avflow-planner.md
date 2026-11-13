@@ -1,6 +1,6 @@
 ---
 name: avflow-planner
-description: Use for the design and planning steps of PLAN and FULL tickets — clarify the design, map the affected code and write the step-by-step plan (steps, files, tests). Read-only; returns the plan to the main session, which posts it as a private note.
+description: Use for the design and planning steps of larger tickets and any ticket in a risk area — clarify the design, map the affected code and write the step-by-step plan (steps, files, tests). Read-only; returns the plan to the main session, which posts it as a private note.
 tools: Read, Grep, Glob
 model: {model}
 ---

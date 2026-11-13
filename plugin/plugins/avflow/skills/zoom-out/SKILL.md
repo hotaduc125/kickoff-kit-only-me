@@ -8,7 +8,7 @@ description: Use before changing code you do not know well — legacy code, a la
 Before you change unfamiliar code, understand where it sits. Do **not** edit anything during this step.
 
 ## When
-- Before planning a ticket in mode **plan** or **full** that touches code you have not read in this session.
+- Before planning a ticket that touches code you have not read in this session.
 - Before changing a **sensitive path** of the project (listed in its CLAUDE.md / CODEOWNERS).
 - When a bug fix has failed **twice** — stop guessing and zoom out.
 - Before any refactoring.
@@ -37,4 +37,4 @@ Risks: …
 Proposed approach (1–3 lines): …
 ```
 
-Then continue with choose-mode and the `workflow` skill for the mode. If the map shows the work touches a sensitive path, the mode is **full**.
+Then write the plan and call `assess_plan` with every file it names (the `tickets` skill). If the map shows the work is riskier than the ticket says, add the risk area with `set_fields` and a reason.

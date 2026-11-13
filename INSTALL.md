@@ -39,7 +39,7 @@ Do not edit the installed skills: `avflow check` reports changed files.
 ## Redmine without admin rights
 avflow works on a standard Redmine:
 - **Statuses:** the team settings map avflow's steps to the statuses your Redmine already has (for Enclave: Ready → New, In progress → In Progress, In review → In Code Review, Ready for test → Ready for testing). `avflow init` writes the same names into the CI job, so no CI variables are needed for them.
-- **Mode, Machine-side, Hotspot:** without custom fields, avflow reads Machine-side and Hotspot from the "Size and mode" line of the ticket description and keeps the confirmed mode in a private note starting with `[avflow]`.
+- **Risk area, Hotspot:** without custom fields, avflow reads them from the "Size and mode" line of the ticket description (`Risk area: …`, `Hotspot: …`); a risk area the agent adds is kept in a private note starting with `[avflow]`. `Machine-side: yes` on older tickets is read as the team's area (Enclave: Machine control). There are no modes any more.
 - **Private notes still need the right role permissions** (an admin setting). Check with a customer test account that private notes are not visible before using real data.
 
 ## Team settings and personal overrides

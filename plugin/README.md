@@ -11,7 +11,7 @@ repository), **equips** the agent (the member's coding workflow and the team ski
 | Layer | What avflow does |
 |---|---|
 | **Connect** | Ticket system through the `avflow-tickets` MCP server (token in the OS keyring); repository and CI through the official CLI (`glab`) |
-| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `choose-mode`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the member chooses (for example Opus to plan and review, Sonnet to implement) |
+| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the member chooses (for example Opus to plan and review, Sonnet to implement) |
 | **Guard** | Ticket rules inside the MCP server (notes always private, only two status changes, …); git guardrails, including blocking commits that contain secrets (and a GitLab CI secret scan as the server-side backup); merge requests go to review only with a green pipeline; integrity check of the installed skills |
 | **Keep in step** | `avflow check` and `avflow update`: everyone runs the same version of the workflow |
 | **Observe** | A context monitor records the context size of every session and subagent, warns before it grows past the team's thresholds, and `avflow usage` summarises it |
@@ -49,7 +49,7 @@ guardrails from `git-guardrails-claude-code`.
 
 | Plugin | Contents |
 |---|---|
-| `avflow` | Skills: `tickets`, `workflow`, `choose-mode`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr` · Commands: `/avflow:next-ticket`, `/avflow:check` |
+| `avflow` | Skills: `tickets`, `workflow`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr` · Commands: `/avflow:next-ticket`, `/avflow:check` |
 
 Installed automatically by `avflow setup`. Manual install in Claude Code:
 

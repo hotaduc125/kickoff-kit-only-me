@@ -50,7 +50,7 @@ Reproduce on the simulator or a test machine. Use the workflow's debugging skill
 
 ## 6. Fix
 
-- Work ticket in mode **FULL** if it touches machine-side code (`choose-mode`).
+- Work ticket with the risk area of the code it touches (or *Other high risk*), so the fix gets that area's checks.
 - A **regression test** that fails before the fix and passes after it.
 - Release through the normal flow (`release` skill), with the incident named in the release notes.
 

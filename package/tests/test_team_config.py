@@ -138,3 +138,19 @@ def test_shipped_enclave_team_file_has_the_mapping():
     assert (tk["status_ready"], tk["status_in_progress"], tk["status_in_review"], tk["status_ready_for_test"]) == \
            ("New", "In Progress", "In Code Review", "Ready for testing")
     assert "Ready for testing" in tk["blocker_done"]
+
+
+def test_enclave_team_maps_machine_side_to_machine_control():
+    import tomllib
+    from pathlib import Path
+    tk = tomllib.loads((Path(__file__).parents[2] / "team" / "avflow-team.toml").read_text())["tickets"]
+    assert tk["machine_side_area"] == "Machine control" and tk["field_risk_area"] == "Risk area"
+
+
+def test_a_2_6_personal_file_still_loads(tmp_path):
+    """Members update from 2.6.x: their personal file may still name the Mode field (no longer read)."""
+    f = tmp_path / "config.toml"
+    f.write_text('[tickets]\nfield_mode = "Chế độ"\nfield_machine_side = "Machine side"\nsomething_new = 1\n', encoding="utf-8")
+    c = Config.load(f, team={"tickets": {"url": "https://r.test"}})
+    assert c.tickets.field_machine_side == "Machine side" and c.tickets.field_risk_area == "Risk area"
+    assert c.tickets.machine_side_area == ""

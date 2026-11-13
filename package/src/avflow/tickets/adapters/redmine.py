@@ -67,17 +67,24 @@ class RedmineAdapter:
             raise AdapterError(f"Custom field '{name}' is not enabled for ticket #{issue['id']} (project/tracker).")
         return f["id"]
 
-    # ---------- Mode / Machine-side / Hotspot
-    # Preferred: Redmine custom fields (created by an admin). Without them (no admin rights), avflow reads
-    # Machine-side and Hotspot from the "Size and mode" line of the description, written by the person, and
-    # keeps the confirmed mode (and any raise of Machine-side) in private notes starting with MARKER.
+    # ---------- Risk area / Hotspot (and Machine-side during the 3.0 transition)
+    # Preferred: Redmine custom fields (created by an admin). Without them (no admin rights), avflow reads the risk area,
+    # Machine-side and Hotspot from the "Size and mode" line of the description, written by the person. The agent never
+    # writes the description or the risk-area field: it adds a risk area (and sets Hotspot without a field) in private
+    # notes starting with MARKER. Risk areas are a union: nothing the agent writes can remove one.
     MARKER = "[avflow]"
+    OTHER = "Other high risk"
 
     def _has_cf(self, issue: dict, name: str) -> bool:
         return self._cf(issue, name) is not None
 
     @staticmethod
-    def _desc_fields(description: str) -> dict:
+    def _split_areas(v) -> list[str]:
+        vals = v if isinstance(v, list) else re.split(r"\s*,\s*", str(v or ""))
+        return [x.strip() for x in vals if x and x.strip() and x.strip().lower() not in ("none", "no", "-", "n/a")]
+
+    @classmethod
+    def _desc_fields(cls, description: str) -> dict:
         d = description or ""
         out = {}
         m = re.search(r"(?im)machine[- ]side\s*:\s*\**\s*(yes|no)\b", d)
@@ -87,53 +94,66 @@ class RedmineAdapter:
         if m:
             v = m.group(1).strip()
             out["hotspot"] = None if v.lower() in ("none", "-", "n/a", "") or v.lower().startswith("todo") else v
-        m = re.search(r"(?im)(?:proposed\s+)?mode\s*:\s*\**\s*(direct|plan|full|spike)\b", d)
+        m = re.search(r"(?im)risk[ -]area\s*:\s*\**\s*([^\n·|*]*?)\s*\**\s*(?:[·|]|$)", d)
         if m:
-            out["mode"] = m.group(1).lower()
+            out["risk_areas"] = cls._split_areas(m.group(1))
+        m = re.search(r"(?im)high[ -]risk\s*:\s*\**\s*(yes|no)\b", d)
+        if m:
+            out["risk_areas"] = out.get("risk_areas", []) + ([cls.OTHER] if m.group(1).lower() == "yes" else [])
+        if re.search(r"(?im)\btype\s*:\s*\**\s*spike\b", d):
+            out["spike"] = True
         return out
 
     @classmethod
     def _marker_fields(cls, journals: list[dict]) -> dict:
-        """Latest values from private notes like '[avflow] mode=plan · machine-side=yes · hotspot=src/a.cs'."""
-        out = {}
+        """Values from private notes like '[avflow] risk-area=Machine_control · hotspot=src/a.cs'.
+
+        Risk areas accumulate over all notes; for hotspot the latest wins. A 2.x 'machine-side=yes' still counts.
+        """
+        out: dict = {"risk_areas": []}
         for j in journals or []:
             text = j.get("notes") or ""
             if not j.get("private_notes") or cls.MARKER not in text:
                 continue
             line = next((l for l in text.splitlines() if l.strip().startswith(cls.MARKER)), "")
-            for k, v in re.findall(r"(mode|machine-side|hotspot)=([^·\s]+)", line):
-                if k == "mode" and v in ("direct", "plan", "full", "spike"):
-                    out["mode"] = v
+            for k, v in re.findall(r"(risk-area|machine-side|hotspot)=([^·\s]+)", line):
+                if k == "risk-area":
+                    out["risk_areas"].append(v.replace("_", " "))
                 elif k == "machine-side":
-                    out["machine_side"] = v.lower() == "yes"
+                    out["machine_side"] = out.get("machine_side") or v.lower() == "yes"
                 elif k == "hotspot":
                     out["hotspot"] = None if v in ("none", "-") else v
         return out
 
     def _fields(self, issue: dict) -> dict:
-        cf = {}
-        if self._has_cf(issue, self.cfg.field_mode):
-            cf["mode"] = (self._cf(issue, self.cfg.field_mode) or {}).get("value") or None
-        if self._has_cf(issue, self.cfg.field_machine_side):
-            ms = (self._cf(issue, self.cfg.field_machine_side) or {}).get("value")
-            cf["machine_side"] = None if ms in (None, "") else ms == "1"
-        if self._has_cf(issue, self.cfg.field_hotspot):
-            cf["hotspot"] = (self._cf(issue, self.cfg.field_hotspot) or {}).get("value") or None
+        cfg = self.cfg
+        has_area_cf = self._has_cf(issue, cfg.field_risk_area)
+        has_ms_cf = self._has_cf(issue, cfg.field_machine_side)
+        has_hs_cf = self._has_cf(issue, cfg.field_hotspot)
         desc = self._desc_fields(issue.get("description") or "")
         notes = self._marker_fields(issue.get("journals") or [])
-        out = {}
-        for k in ("mode", "machine_side", "hotspot"):
-            if k in cf:
-                out[k] = cf[k]
-            elif k == "machine_side":
-                vals = [v for v in (desc.get(k), notes.get(k)) if v is not None]
-                out[k] = (True in vals) if vals else None      # only ever raised to yes
-            elif k == "mode":
-                out[k] = notes.get(k) or desc.get(k)            # confirmed in a note wins over the description
-            else:
-                out[k] = notes.get(k) if k in notes else desc.get(k)
-        out["source"] = "custom fields" if cf else "description and private notes"
-        return out
+        areas = self._split_areas((self._cf(issue, cfg.field_risk_area) or {}).get("value")) if has_area_cf \
+            else list(desc.get("risk_areas", []))
+        if has_ms_cf:
+            ms = (self._cf(issue, cfg.field_machine_side) or {}).get("value") == "1"
+        else:
+            ms = bool(desc.get("machine_side"))
+        if ms or notes.get("machine_side"):
+            areas.append(cfg.machine_side_area or self.OTHER)
+        areas += notes["risk_areas"]
+        seen, uniq = set(), []
+        for a in areas:
+            k = re.sub(r"[\s_]+", " ", a).strip().lower()
+            if k not in seen:
+                seen.add(k)
+                uniq.append(a)
+        if has_hs_cf:
+            hotspot = (self._cf(issue, cfg.field_hotspot) or {}).get("value") or None
+        else:
+            hotspot = notes["hotspot"] if "hotspot" in notes else desc.get("hotspot")
+        spike = (issue.get("tracker") or {}).get("name", "").lower() == "spike" or bool(desc.get("spike"))
+        return {"risk_areas": uniq, "hotspot": hotspot, "spike": spike,
+                "source": "custom fields" if (has_area_cf or has_hs_cf) else "description and private notes"}
 
     def _blockers(self, issue: dict) -> list[dict]:
         me, ids = issue["id"], []
@@ -170,7 +190,7 @@ class RedmineAdapter:
         for i in self._req("GET", "/issues.json", params=params)["issues"]:
             out.append({"id": i["id"], "subject": i["subject"], "type": i["tracker"]["name"],
                         "priority": i["priority"]["name"], "target_version": (i.get("fixed_version") or {}).get("name"),
-                        "mode": self._fields(i)["mode"]})
+                        "risk_areas": self._fields(i)["risk_areas"]})
         return out
 
     def get(self, ticket_id: int) -> Ticket:
@@ -194,25 +214,27 @@ class RedmineAdapter:
     def add_private_note(self, ticket_id: int, text: str) -> None:
         self._req("PUT", f"/issues/{ticket_id}.json", json={"issue": {"notes": text, "private_notes": True}})
 
-    def set_fields(self, ticket_id: int, mode, machine_side, hotspot) -> None:
+    def set_fields(self, ticket_id: int, risk_area: str | None, hotspot: str | None, reason: str | None = None) -> None:
         i = self._issue(ticket_id, include="")
-        cf, marker = [], []
-        for value, name, key, render in ((mode, self.cfg.field_mode, "mode", lambda v: v),
-                                         (machine_side, self.cfg.field_machine_side, "machine-side", lambda v: "1" if v else "0"),
-                                         (hotspot, self.cfg.field_hotspot, "hotspot", lambda v: v)):
-            if value is None:
-                continue
-            if self._has_cf(i, name):
-                cf.append({"id": self._cf_id(i, name), "value": render(value)})
-            elif key == "machine-side":
-                marker.append(f"machine-side={'yes' if value else 'no'}")
+        marker = []
+        if risk_area:
+            marker.append("risk-area=" + re.sub(r"\s+", "_", risk_area.strip()))
+        if hotspot is not None:
+            if self._has_cf(i, self.cfg.field_hotspot):
+                self._req("PUT", f"/issues/{ticket_id}.json",
+                          json={"issue": {"custom_fields": [{"id": self._cf_id(i, self.cfg.field_hotspot), "value": hotspot}]}})
             else:
-                marker.append(f"{key}={(value or 'none').replace(' ', '_')}")
-        if cf:
-            self._req("PUT", f"/issues/{ticket_id}.json", json={"issue": {"custom_fields": cf}})
+                marker.append(f"hotspot={(hotspot or 'none').replace(' ', '_')}")
         if marker:
-            note = f"{self.MARKER} " + " · ".join(marker) + "\n(avflow fields kept in this private note: no custom fields in this Redmine)"
+            note = f"{self.MARKER} " + " · ".join(marker)
+            note += f"\nRisk area added by the coding agent: {reason}" if risk_area else \
+                "\n(avflow fields kept in this private note: no custom field in this Redmine)"
             self._req("PUT", f"/issues/{ticket_id}.json", json={"issue": {"notes": note, "private_notes": True}})
+
+    def avflow_notes(self, ticket_id: int) -> list[str]:
+        """Full text of every PRIVATE note that contains the avflow marker, oldest first (public ones never count)."""
+        return [j["notes"] for j in self._issue(ticket_id, include="journals").get("journals", []) or []
+                if j.get("private_notes") and self.MARKER in (j.get("notes") or "")]
 
     def set_status(self, ticket_id: int, logical: str, note: str) -> None:
         name = {"in_progress": self.cfg.status_in_progress, "in_review": self.cfg.status_in_review}[logical]

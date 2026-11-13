@@ -5,7 +5,7 @@ Read this file first, then `docs/CONTEXT.md` (the project's domain glossary).
 ## Tools and skills (installed by `avflow setup`, not stored in this repository)
 
 - Tickets: **only** through the `avflow-tickets` MCP server (skill `avflow:tickets`). Notes are always private.
-- Before any work: `avflow:choose-mode`; what each mode requires: `avflow:workflow`.
+- How every ticket runs and how to satisfy its required checks: `avflow:workflow`.
 - Customer tickets: `avflow:triage`. Field problems: `avflow:incident`. Releases: `avflow:release`.
 - Domain terms: `avflow:glossary`. Hard-to-reverse decisions: `avflow:adr`.
 - Git guardrails block pushes to protected branches, force pushes, destructive commands and commits with secrets. If a command is blocked, tell the person; do not work around it.
@@ -16,10 +16,11 @@ Read this file first, then `docs/CONTEXT.md` (the project's domain glossary).
 - Build: `TODO`
 - Test: `TODO`
 
-## Sensitive paths (always mode FULL, code-owner review)
+## Risk areas
 
-<!-- TODO: list the files or folders where a mistake reaches production, hardware or customers -->
-- `TODO`
+The files where a mistake reaches production, hardware or customers are the risk areas in `.avflow/project.toml`
+(paths, owners, extra checks). The ticket tools apply them; `avflow risk check` validates the file and
+`avflow risk files <paths>` shows which checks a change needs.
 
 ## Branches and commits
 

@@ -1,6 +1,6 @@
 ---
 name: avflow-implementer
-description: Use to implement a confirmed plan step by step for PLAN and FULL tickets — tests first, small diffs, only the files in scope. Returns what was done, the tests run and anything unexpected.
+description: Use to implement a confirmed plan step by step for any ticket whose plan is confirmed (or needs no confirmation) — tests first, small diffs, only the files in scope. Returns what was done, the tests run and anything unexpected.
 model: {model}
 ---
 

@@ -1,6 +1,6 @@
 # avflow 3.0 — Design: one flow, project-defined risk
 
-Status: **proposed** (decisions at the end are still open) · Nov 12, 2026 · Alvin
+Status: **accepted** — decisions answered Nov 13, 2026 (GitLab tier still open); phase 1 built on branch `avflow-3.0-phase1` · Nov 12, 2026 · Alvin
 Source: Claude Docs design doc (exported). This file is now the reference for implementation.
 
 ## Summary
@@ -263,13 +263,15 @@ About 4–4.5 working days in three phases; each phase ends usable.
 
 **Decisions needed before building** (record the answers in `docs/decisions.md`)
 
-- [ ] Approve removing the four modes (one flow for every ticket).
-- [ ] Ticket field for the risk area: a Redmine list field (needs an admin; values follow each project's profile), or the `Risk area:` line in the description. For Enclave now: keep *Machine-side* mapped to *Machine control* during the transition?
-- [ ] Should the CI gate **fail** the pipeline from the start, or **report only** during the pilot?
-- [ ] Check Enclave's GitLab tier: is required code-owner approval available (Premium), or must the CI job check approvals?
-- [ ] Is a mandatory short plan note acceptable for every ticket, including one-line changes?
-- [ ] Strict default for new projects: which checks, and for how long by default?
-- [ ] Which stack presets ship first (.NET, Node, Python, Java, Go proposed), and should Enclave add a WPF + Zmotion preset for its machine projects?
+Answered Nov 13, 2026 — see `docs/decisions.md` (3.0).
+
+- [x] Approve removing the four modes (one flow for every ticket). — **Yes.**
+- [x] Ticket field for the risk area. — **Both: list field when it exists, `Risk area:` line otherwise; Machine-side *yes* maps to Machine control.**
+- [x] Should the CI gate **fail** the pipeline from the start, or **report only** during the pilot? — **Report only in the pilot.**
+- [ ] Check Enclave's GitLab tier: is required code-owner approval available (Premium), or must the CI job check approvals? — **Open**; build the API check.
+- [x] Is a mandatory short plan note acceptable for every ticket, including one-line changes? — **Yes.**
+- [x] Strict default for new projects: which checks, and for how long by default? — **Plan confirmation + independent review, 6 weeks.**
+- [x] Which stack presets ship first? — **All five; no Enclave WPF + Zmotion preset.**
 
 **Phases**
 

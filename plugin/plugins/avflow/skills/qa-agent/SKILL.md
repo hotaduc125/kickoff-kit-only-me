@@ -1,6 +1,6 @@
 ---
 name: qa-agent
-description: Use for QA work without a dedicated tester — (1) design test cases from a ticket's acceptance criteria before any code is written, (2) review a change independently from the spec and the diff only and try to break it, (3) reproduce a reported bug on the simulator and turn it into a private bug draft, (4) prepare the release checklist items and test report, or (5) run the two-stage review required for FULL tickets, whatever workflow is installed.
+description: Use for QA work without a dedicated tester — (1) design test cases from a ticket's acceptance criteria before any code is written, (2) review a change independently from the spec and the diff only and try to break it, (3) reproduce a reported bug on the simulator and turn it into a private bug draft, (4) prepare the release checklist items and test report, or (5) run the two-stage review required by the `independent-review` check, whatever workflow is installed.
 ---
 
 # QA agent
@@ -42,9 +42,9 @@ Pick the mode of use that matches the request.
 3. Write the release test report: pipeline results, simulator regression, UI tests, mutation score, AI evaluation scores (if AI features changed), open known issues.
 4. Give the report to the QA lead of the release; the QA lead decides whether it goes to the customer's acceptance.
 
-## E. Two-stage review for FULL tickets
+## E. Two-stage review (`independent-review`)
 
-Required for every FULL ticket, with either workflow. Run it after the implementation and before the person's review, by delegating to the **`avflow-reviewer`** subagent — a **fresh context** that has not seen the implementation reasoning, on the model the member chose for review.
+Required whenever `start_ticket`, `assess_plan` or `review_requirements` lists `independent-review`, with either workflow. Run it after the implementation and before the person's review, by delegating to the **`avflow-reviewer`** subagent — a **fresh context** that has not seen the implementation reasoning, on the model the member chose for review.
 
 1. **Stage 1 — spec.** Compare the diff with the ticket's scope, out-of-scope list and acceptance criteria, and with the approved test cases. Anything missing, extra or different from the spec is **Blocking**.
 2. **Stage 2 — code quality.** Only when stage 1 passes: readability, error handling and logging, tests that really test the behaviour, no unrelated changes, sensitive-path rules respected. (With Matt Pocock's skills, `code-review` covers both axes and may be used here.)

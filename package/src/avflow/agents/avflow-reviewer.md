@@ -1,6 +1,6 @@
 ---
 name: avflow-reviewer
-description: Use for the independent two-stage review of FULL tickets (and any change the person asks to have reviewed) — stage 1 against the spec, stage 2 code quality — in a fresh context that has not seen the implementation reasoning.
+description: Use for the independent two-stage review required by the `independent-review` check (and any change the person asks to have reviewed) — stage 1 against the spec, stage 2 code quality — in a fresh context that has not seen the implementation reasoning.
 tools: Read, Grep, Glob, Bash
 model: {model}
 ---

@@ -5,7 +5,38 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
-## Open — avflow 3.0 (proposed, not built yet)
+## 3.0 — decisions taken before building (Nov 13, 2026)
+
+The PM answered the open decisions of `docs/design/avflow-3.0.md`:
+
+- **Modes removed.** One flow for every ticket; `start_ticket` no longer needs Mode, `set_fields` no longer sets it, the
+  Mode field and `[avflow] mode=` notes are ignored. SPIKE becomes a ticket type. `choose-mode` is removed in phase 1
+  (not phase 3), because it calls `set_fields(mode=…)`, which no longer exists.
+- **Ticket risk area: custom field preferred, description line otherwise** (same pattern as 2.5). Team setting
+  `field_risk_area`; without that field, the `Risk area:` line (also `High risk: yes` → Other high risk) is read.
+- **Machine-side = yes maps to an area** through the team setting `machine_side_area` (Enclave: `Machine control`);
+  without the setting it reads as *Other high risk*.
+- **Several risk areas per ticket; the agent can only add.** The agent adds an area (with a reason) in a private
+  `[avflow] risk-area=…` note — never by writing the custom field, whose options a person owns. Nothing lowers or removes an
+  area except a person editing the ticket. *Why:* a union keeps "risk only goes up" trivial to enforce.
+- **Mandatory plan note for every ticket.** `assess_plan` takes the plan text and posts it, so the note is enforced in code.
+- **Required checks are remembered in private `[avflow] required {…}` notes** at start, plan and review; each stage takes the
+  union with the earlier ones. `submit_for_review` refuses until `review_requirements` has run.
+- **Changed files at review come from git** (merge base with the target branch → HEAD), not from a list the agent supplies.
+  `base` may only name a branch, and must agree with the MR's target branch when glab can read it.
+- **The agent cannot forge `[avflow]` lines:** `add_private_note` refuses text with a line starting with `[avflow]`, and
+  `set_fields` folds `reason` and `hotspot` onto one line. *Why:* the required checks and the "review done" step live in
+  those notes; without this, the agent could write its own `required … "stage": "review"` note and skip the gate.
+- **CI gate: report only during the pilot**, with a switch to fail later (phase 2).
+- **Strict default for new projects:** `plan-confirmation` + `independent-review`, `until` = init date + 6 weeks (phase 2).
+- **Stack presets:** all five (.NET, Node, Python, Java, Go); no Enclave WPF + Zmotion team preset — Mateo writes its
+  Machine control area by hand (phase 2).
+- **Still open — GitLab tier** of `gitlab.enclave.vn`. On Free, CODEOWNERS does not block; the CI job must read MR approvals
+  through the API (needs a project access token with `read_api`; approving does not re-run the pipeline). A GitLab MCP
+  connector cannot be the gate: it is the agent's tool, and the judge must be independent of the agent (2.4). Build the API
+  check (works on both tiers) in phase 2, report-only until the tier is confirmed.
+
+## avflow 3.0 — the design (proposed Nov 12, 2026)
 
 **Replace the four working modes with one flow and project-defined risk areas.** See `docs/design/avflow-3.0.md`.
 
@@ -16,7 +47,7 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 - *Why generic risk areas:* avflow must serve many projects, not only Mateo; "Machine-side" is a Mateo concept.
 - *New projects:* stack presets (paths by stack conventions), areas by concern (no paths yet, picked on tickets), a strict
   default for the first weeks, and gaps from evidence.
-- *Open decisions:* listed at the end of the design doc. Do not implement them by assumption — ask the PM.
+- *Open decisions:* answered above, except the GitLab tier.
 
 ---
 

@@ -86,13 +86,13 @@ def setup_tickets_redmine(existing: TicketConfig | None) -> TicketConfig:
                     for attr, label in (("status_ready", "Ready"), ("status_in_progress", "In progress"), ("status_in_review", "In review")):
                         while getattr(t, attr) not in available:
                             setattr(t, attr, ask(f"  Status to use for '{label}'", available[0]))
-        print("  ➖ Mode, Machine-side, Hotspot: custom fields are used when they exist; otherwise avflow reads them from the")
-        print("     'Size and mode' line of the ticket description and keeps the confirmed mode in a private note.")
-        if ask("Use the default status and field names (Ready, In progress, In review, Mode, Machine-side, Hotspot)? y/n", "y").lower() != "y":
+        print("  ➖ Risk area, Hotspot (and Machine-side during the transition): custom fields are used when they exist;")
+        print("     otherwise avflow reads them from the 'Size and mode' line of the ticket description.")
+        if ask("Use the default status and field names (Ready, In progress, In review, Risk area, Machine-side, Hotspot)? y/n", "y").lower() != "y":
             t.status_ready = ask("Status: ready", t.status_ready)
             t.status_in_progress = ask("Status: in progress", t.status_in_progress)
             t.status_in_review = ask("Status: in review", t.status_in_review)
-            t.field_mode = ask("Field: mode", t.field_mode)
+            t.field_risk_area = ask("Field: risk area", t.field_risk_area)
             t.field_machine_side = ask("Field: machine-side", t.field_machine_side)
             t.field_hotspot = ask("Field: hotspot", t.field_hotspot)
         set_secret("redmine", t.url, token)
@@ -529,6 +529,73 @@ def cmd_init(args) -> int:
     return 0
 
 
+def _risk_root(path: str):
+    from pathlib import Path
+
+    from .tickets.repo import GitRepo
+    return GitRepo(path).root() or Path(path)
+
+
+def cmd_risk_check(args) -> int:
+    from datetime import date
+
+    from . import risk
+    root = _risk_root(args.path)
+    p = risk.load(root)
+    if p is None:
+        bad(f"No {risk.PROFILE.as_posix()} in {root} — `avflow init` adds one with examples.")
+        return 1
+    for w in p.warnings:
+        print(f"  ⚠️  {w}")
+    if p.problems:
+        for x in p.problems:
+            bad(x)
+        return 1
+    ok(f"{risk.PROFILE.as_posix()}: {len(p.areas)} risk areas" + (f" ({p.name})" if p.name else ""))
+    for a in p.areas:
+        where = ", ".join(a.paths) if a.paths else "no paths yet — recognised only when a ticket names it"
+        print(f"  • {a.name}: {', '.join(a.checks)}" + (f" · owners {', '.join(a.owners)}" if a.owners else ""))
+        print(f"      paths: {where}")
+    other = risk.BUILTIN_OTHER if p.other_checks is None else p.other_checks
+    print(f"  • {risk.OTHER} (ticket): {', '.join(other) or 'standard flow'}"
+          + ("  [avflow default]" if p.other_checks is None else ""))
+    if p.default_checks:
+        if p.default_until and date.today() > p.default_until:
+            print(f"  • Strict default ended on {p.default_until.isoformat()} — remove [risk.default] or move its date.")
+        else:
+            print(f"  • Strict default for changes outside every area: {', '.join(p.default_checks)}"
+                  + (f" until {p.default_until.isoformat()}" if p.default_until else ""))
+    return 0
+
+
+def cmd_risk_files(args) -> int:
+    from . import risk
+    root = _risk_root(args.path)
+    p = risk.load(root)
+    if p is not None and p.problems:
+        bad(f"{risk.PROFILE.as_posix()} has problems — run `avflow risk check`.")
+        return 1
+    r = risk.requirements(p, args.area or [], args.files)
+    for w in r.warnings:
+        print(f"  ⚠️  {w}")
+    print("Risk areas: " + (", ".join(f"{k} ({v})" for k, v in r.areas.items()) or "none"))
+    for a, fs in r.files.items():
+        print(f"  {a}: {', '.join(fs)}")
+    if r.default_applied:
+        print("  (strict default [risk.default] applies: no area matched)")
+    if r.checks:
+        print("Required checks:")
+        for c in r.checks:
+            print(f"  - {risk.describe(c)}")
+    else:
+        print("Required checks: none — standard flow (tests, green pipeline, a person's review).")
+    if r.gaps:
+        print("Profile gaps (files of a high-risk ticket outside every area):")
+        for g in r.gaps:
+            print(f"  - {g}")
+    return 0
+
+
 def _ticket_adapter():
     cfg = Config.load()
     t = cfg.tickets
@@ -655,6 +722,16 @@ def main(argv=None) -> int:
     rp.add_argument("--days", type=int, default=7, help="length of the period (default: 7)")
     rp.add_argument("--out", help="write to this file instead of printing")
     rp.set_defaults(fn=cmd_report)
+    rk = sub.add_parser("risk", help="the project's risk profile (.avflow/project.toml)")
+    rks = rk.add_subparsers(dest="risk_cmd", required=True)
+    rc = rks.add_parser("check", help="validate the profile and list its risk areas")
+    rc.add_argument("--path", default=".", help="repository folder (default: current folder)")
+    rc.set_defaults(fn=cmd_risk_check)
+    rf = rks.add_parser("files", help="which risk areas and checks apply to these files")
+    rf.add_argument("files", nargs="+", help="paths relative to the repository root")
+    rf.add_argument("--area", action="append", help="the ticket's risk area (repeatable; 'Other high risk' allowed)")
+    rf.add_argument("--path", default=".", help="repository folder (default: current folder)")
+    rf.set_defaults(fn=cmd_risk_files)
     us = sub.add_parser("usage", help="context size per session and subagent calls (from the context monitor)")
     us.add_argument("--days", type=int, default=7)
     us.set_defaults(fn=cmd_usage)

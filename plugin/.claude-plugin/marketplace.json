@@ -6,7 +6,7 @@
     {
       "name": "avflow",
       "source": "./plugins/avflow",
-      "description": "Team skills and commands: ticket workflow, choose-mode, qa-agent, ticket writing."
+      "description": "Team skills and commands: one ticket flow with project-defined risk, qa-agent, ticket writing."
     }
   ]
 }
