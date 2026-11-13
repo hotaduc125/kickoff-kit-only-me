@@ -61,7 +61,7 @@ def setup_tickets_redmine(existing: TicketConfig | None) -> TicketConfig:
     old_url = t.url
     print("\nRedmine — your own account. The API key is under My account → API access key.")
     for attempt in range(3):
-        t.url = ask("Redmine URL (base address, e.g. https://redmine.example.com/redmine)", t.url).rstrip("/")
+        t.url = ask("Redmine URL (base address, e.g. https://redmine.example.com)", t.url).rstrip("/")
         token = getpass.getpass("Redmine API key (hidden): ").strip()
         try:
             me = make_adapter(t, token).whoami()
@@ -105,13 +105,13 @@ def setup_tickets_redmine(existing: TicketConfig | None) -> TicketConfig:
 
 
 REDMINE_DEFAULT_PRESET = {"status_ready": "New", "status_in_progress": "In Progress", "status_in_review": "Feedback",
-                          "blocker_done": ["Resolved", "Closed"]}
+                          "status_ready_for_test": "Resolved", "blocker_done": ["Resolved", "Closed"]}
 
 
 def status_plan(available: list[str], t) -> dict:
     """Which configured statuses are missing, and whether Redmine's default statuses can stand in for them."""
     have = {a.lower() for a in available}
-    missing = [n for n in (t.status_ready, t.status_in_progress, t.status_in_review) if n.lower() not in have]
+    missing = [n for n in (t.status_ready, t.status_in_progress, t.status_in_review, t.status_ready_for_test) if n.lower() not in have]
     preset = None
     if missing and all(v.lower() in have for k, v in REDMINE_DEFAULT_PRESET.items() if k != "blocker_done"):
         preset = REDMINE_DEFAULT_PRESET
@@ -130,7 +130,7 @@ def print_team_summary(cfg) -> None:
     t, w, m, mo = cfg.tickets, cfg.workflow, cfg.models, cfg.monitor
     print(f"Team settings (release {v}) — use `avflow setup --advanced` to change them for yourself")
     print(f"  Redmine {t.url or '(not set)'} · GitLab {cfg.repo.host}")
-    print(f"  Statuses: {t.status_ready} → {t.status_in_progress} → {t.status_in_review} → {', '.join(t.blocker_done)}")
+    print(f"  Statuses: {t.status_ready} → {t.status_in_progress} → {t.status_in_review} → {t.status_ready_for_test}")
     print(f"  Workflow: {st.PROFILES.get(w.profile, w.profile)} · git guardrails {'on' if w.git_guardrails else 'off'}")
     print(f"  Models: plan {m.plan} · implement {m.implement} · review {m.review}")
     print(f"  Context monitor: {'on' if mo.enabled else 'off'} (warn {mo.warn_tokens // 1000}k, limit {mo.critical_tokens // 1000}k)\n")
@@ -140,7 +140,7 @@ def setup_redmine_token(t: TicketConfig) -> TicketConfig:
     """Default setup: the team gives the URL and names; the member only enters their own API key."""
     old_url = t.url
     if not t.url:
-        t.url = ask("Redmine URL (base address, e.g. https://redmine.example.com/redmine)").rstrip("/")
+        t.url = ask("Redmine URL (base address, e.g. https://redmine.example.com)").rstrip("/")
     print(f"Redmine — your own account at {t.url}. The API key is under My account → API access key.")
     for _ in range(3):
         token = getpass.getpass("Redmine API key (hidden): ").strip()
@@ -513,7 +513,11 @@ def cmd_init(args) -> int:
     from pathlib import Path
 
     from .init_repo import init_repo
-    r = init_repo(Path(args.path), args.project, args.force)
+    try:
+        cfg = Config.load()
+    except SystemExit:
+        cfg = Config.team()
+    r = init_repo(Path(args.path), args.project, args.force, cfg)
     for f in r["created"]:
         ok(f"created {f}")
     for f in r["overwritten"]:

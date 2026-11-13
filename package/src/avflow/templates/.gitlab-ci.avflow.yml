@@ -39,6 +39,9 @@ avflow-ready-for-test:
   image: python:3.12-slim
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_PIPELINE_SOURCE == "push"'
+  variables:                       # the team's Redmine status names, written by `avflow init`
+    AVFLOW_STATUS_IN_REVIEW: "{status_in_review}"
+    AVFLOW_STATUS_READY_FOR_TEST: "{status_ready_for_test}"
   script:
     - apt-get update -qq && apt-get install -y -qq git > /dev/null
     - python ci/avflow_redmine_update.py

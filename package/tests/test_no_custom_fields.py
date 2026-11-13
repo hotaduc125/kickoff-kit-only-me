@@ -109,9 +109,10 @@ def test_custom_fields_still_preferred(tmp_path):
 def test_status_plan_detects_redmine_defaults():
     t = TicketConfig()
     p = cli.status_plan(["New", "In Progress", "Resolved", "Feedback", "Closed", "Rejected"], t)
-    assert set(p["missing"]) == {"Ready", "In review"} and p["preset"]  # "In progress" matches "In Progress"
+    assert set(p["missing"]) == {"Ready", "In review", "Ready for test"} and p["preset"]  # "In progress" matches "In Progress"
     cli.apply_status_preset(t, p["preset"])
-    assert (t.status_ready, t.status_in_progress, t.status_in_review, t.blocker_done) == ("New", "In Progress", "Feedback", ["Resolved", "Closed"])
+    assert (t.status_ready, t.status_in_progress, t.status_in_review, t.status_ready_for_test, t.blocker_done) == \
+           ("New", "In Progress", "Feedback", "Resolved", ["Resolved", "Closed"])
 
 
 def test_status_plan_nothing_missing():

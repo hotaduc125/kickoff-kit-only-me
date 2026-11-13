@@ -10,6 +10,18 @@ avflow is the team's harness around the coding agent: it connects the ticket sys
 | `docs/WINDOWS_TEST.md` | Step-by-step Windows test checklist |
 | `INSTALL.md` | Team-facing install guide (copied into each release) |
 
+## Documentation and context
+
+| File | What |
+|---|---|
+| `CLAUDE.md` | Instructions for AI agents working on this repository (read first) |
+| `docs/decisions.md` | Decision log: what was decided and why |
+| `docs/design/avflow-3.0.md` | Design of the next version (one flow, project-defined risk) |
+| `docs/user-guide.md` | User guide for members (source of truth) |
+| `docs/test-plan.md` | End-to-end test plan (Redmine, GitLab, CI, all features) |
+| `docs/WINDOWS_TEST.md` | Windows test checklist |
+| `examples/avflow-sandbox/` | Sample project with ready-made test tickets |
+
 ## Team settings
 `team/avflow-team.toml` is the team configuration: Redmine URL, statuses and field names, GitLab host, coding workflow, guardrails, protected branches, models and context thresholds. `release.py` validates it and embeds it in the release; members only enter their tokens in setup. Change it, release, and tell the team to run `avflow update`.
 

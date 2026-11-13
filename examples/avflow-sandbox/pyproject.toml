@@ -1,0 +1,16 @@
+[project]
+name = "avflow-sandbox"
+version = "0.1.0"
+description = "Small sample project for testing the avflow workflow end to end (Redmine, GitLab, CI)."
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110

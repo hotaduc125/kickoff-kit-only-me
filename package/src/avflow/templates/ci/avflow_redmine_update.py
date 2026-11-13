@@ -1,5 +1,5 @@
 """CI step (avflow): after a merge into develop, move the referenced Redmine tickets from "In review" to
-"Ready for test", with a private note linking the commit and pipeline. Standard library only."""
+the team's "Ready for test" status, with a private note linking the commit and pipeline. Standard library only."""
 from __future__ import annotations
 
 import json
@@ -27,8 +27,9 @@ def main() -> int:
     if not url or not key:
         print("REDMINE_URL / REDMINE_CI_API_KEY not set — skipping.")
         return 0
-    frm = os.environ.get("AVFLOW_STATUS_IN_REVIEW", "In review").lower()
-    to = os.environ.get("AVFLOW_STATUS_READY_FOR_TEST", "Ready for test").lower()
+    frm_name = os.environ.get("AVFLOW_STATUS_IN_REVIEW", "In review")
+    to_name = os.environ.get("AVFLOW_STATUS_READY_FOR_TEST", "Ready for test")
+    frm, to = frm_name.lower(), to_name.lower()
     before, sha = os.environ.get("CI_COMMIT_BEFORE_SHA", ""), os.environ.get("CI_COMMIT_SHA", "HEAD")
     rng = sha if not before or set(before) == {"0"} else f"{before}..{sha}"
     try:
@@ -41,7 +42,7 @@ def main() -> int:
         return 0
     statuses = {s["name"].lower(): s["id"] for s in call(url, key, "GET", "/issue_statuses.json")["issue_statuses"]}
     if to not in statuses:
-        print(f"Status '{to}' not found in Redmine.")
+        print(f"Status '{to_name}' not found in Redmine.")
         return 1
     link = f"{os.environ.get('CI_PROJECT_URL', '')}/-/commit/{sha} · pipeline {os.environ.get('CI_PIPELINE_URL', '')}"
     for i in ids:
@@ -52,8 +53,8 @@ def main() -> int:
             continue
         if current.lower() == frm:
             call(url, key, "PUT", f"/issues/{i}.json", {"issue": {"status_id": statuses[to], "private_notes": True,
-                                                                  "notes": f"Merged into develop ({link}). Ready for test."}})
-            print(f"#{i}: {current} → Ready for test")
+                                                                  "notes": f"Merged into develop ({link}). {to_name}."}})
+            print(f"#{i}: {current} → {to_name}")
         else:
             print(f"#{i}: status is '{current}' — unchanged")
     return 0

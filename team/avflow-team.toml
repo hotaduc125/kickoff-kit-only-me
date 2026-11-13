@@ -5,17 +5,13 @@
 
 [tickets]
 provider = "redmine"
-url = "https://redmine.enclave.vn/redmine"
-# Statuses and fields created by the Redmine admin (recommended):
-status_ready = "Ready"
-status_in_progress = "In progress"
-status_in_review = "In review"
-blocker_done = ["Ready for test", "Resolved", "Closed"]
-# Without an admin's setup, use Redmine's default statuses instead:
-# status_ready = "New"
-# status_in_progress = "In Progress"
-# status_in_review = "Feedback"
-# blocker_done = ["Resolved", "Closed"]
+url = "https://redmine.enclave.vn"
+# Enclave Redmine status names (matched case-insensitively):
+status_ready = "New"                       # avflow "Ready"
+status_in_progress = "In Progress"
+status_in_review = "In Code Review"
+status_ready_for_test = "Ready for testing"
+blocker_done = ["Ready for testing", "Resolved", "Closed"]   # a blocking ticket counts as finished in these
 field_mode = "Mode"
 field_machine_side = "Machine-side"
 field_hotspot = "Hotspot"

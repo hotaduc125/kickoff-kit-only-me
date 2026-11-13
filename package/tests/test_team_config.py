@@ -101,3 +101,40 @@ def test_config_reset_drops_overrides(tmp_path, monkeypatch):
         reset = True
     assert cli.cmd_config(Args()) == 0
     assert Config.load(p).models.review == Config.team().models.review
+
+
+ENCLAVE = {"tickets": {"status_ready": "New", "status_in_progress": "In Progress",
+                       "status_in_review": "In Code Review", "status_ready_for_test": "Ready for testing"}}
+
+
+def test_init_writes_team_status_names_into_ci(tmp_path):
+    import yaml
+    from avflow.init_repo import init_repo
+    init_repo(tmp_path, cfg=Config.team(ENCLAVE))
+    job = yaml.safe_load((tmp_path / ".gitlab-ci.avflow.yml").read_text())["avflow-ready-for-test"]
+    assert job["variables"] == {"AVFLOW_STATUS_IN_REVIEW": "In Code Review", "AVFLOW_STATUS_READY_FOR_TEST": "Ready for testing"}
+    assert "{status_" not in (tmp_path / ".gitlab-ci.avflow.yml").read_text()
+
+
+def test_status_plan_with_enclave_names():
+    t = Config.team(ENCLAVE).tickets
+    p = cli.status_plan(["New", "In Progress", "In Code Review", "Ready for testing", "Closed"], t)
+    assert p["missing"] == []
+
+
+def test_report_buckets_use_team_names():
+    from avflow import report
+    t = Config.team(ENCLAVE).tickets
+    assert report.bucket("Ready for testing", t) == "Ready for test"
+    assert report.bucket("In Code Review", t) == "In review"
+    assert report.bucket("In Progress", t) == "In progress"
+
+
+def test_shipped_enclave_team_file_has_the_mapping():
+    import tomllib
+    from pathlib import Path
+    team = tomllib.loads((Path(__file__).parents[2] / "team" / "avflow-team.toml").read_text())
+    tk = team["tickets"]
+    assert (tk["status_ready"], tk["status_in_progress"], tk["status_in_review"], tk["status_ready_for_test"]) == \
+           ("New", "In Progress", "In Code Review", "Ready for testing")
+    assert "Ready for testing" in tk["blocker_done"]

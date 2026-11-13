@@ -38,7 +38,7 @@ Do not edit the installed skills: `avflow check` reports changed files.
 
 ## Redmine without admin rights
 avflow works on a standard Redmine:
-- **Statuses:** if Ready / In progress / In review do not exist, setup offers Redmine's default statuses (Ready → New, In progress → In Progress, In review → Feedback, Ready for test → Resolved). In GitLab, set the CI/CD variables `AVFLOW_STATUS_IN_REVIEW=Feedback` and `AVFLOW_STATUS_READY_FOR_TEST=Resolved` so the CI job uses the same names.
+- **Statuses:** the team settings map avflow's steps to the statuses your Redmine already has (for Enclave: Ready → New, In progress → In Progress, In review → In Code Review, Ready for test → Ready for testing). `avflow init` writes the same names into the CI job, so no CI variables are needed for them.
 - **Mode, Machine-side, Hotspot:** without custom fields, avflow reads Machine-side and Hotspot from the "Size and mode" line of the ticket description and keeps the confirmed mode in a private note starting with `[avflow]`.
 - **Private notes still need the right role permissions** (an admin setting). Check with a customer test account that private notes are not visible before using real data.
 

@@ -23,15 +23,21 @@ def template_files() -> list[tuple[str, str]]:
     return sorted(out)
 
 
-def init_repo(target: Path, project: str | None = None, force: bool = False) -> dict[str, list[str]]:
+def init_repo(target: Path, project: str | None = None, force: bool = False, cfg=None) -> dict[str, list[str]]:
     target = Path(target)
     project = project or target.resolve().name
+    if cfg is None:
+        from .config import Config
+        cfg = Config.team()
+    names = {"{status_in_review}": cfg.tickets.status_in_review, "{status_ready_for_test}": cfg.tickets.status_ready_for_test}
     result = {"created": [], "skipped": [], "overwritten": []}
     for rel, text in template_files():
         if rel.startswith("__"):
             continue
         dst = target / rel
         content = text.replace("{project}", project).replace("{date}", date.today().isoformat())
+        for k, v in names.items():
+            content = content.replace(k, v)
         if dst.exists() and not force:
             result["skipped"].append(rel)
             continue

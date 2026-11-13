@@ -21,7 +21,7 @@ def bucket(status: str, cfg) -> str:
         return "In progress"
     if s == cfg.status_in_review.lower():
         return "In review"
-    if s == "ready for test":
+    if s == cfg.status_ready_for_test.lower():
         return "Ready for test"
     if s in ("resolved", "closed", "rejected"):
         return "Done"

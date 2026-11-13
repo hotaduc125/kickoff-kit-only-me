@@ -25,6 +25,7 @@ class TicketConfig:
     status_ready: str = "Ready"
     status_in_progress: str = "In progress"
     status_in_review: str = "In review"
+    status_ready_for_test: str = "Ready for test"   # set by the CI job after a merge
     field_mode: str = "Mode"
     field_machine_side: str = "Machine-side"
     field_hotspot: str = "Hotspot"

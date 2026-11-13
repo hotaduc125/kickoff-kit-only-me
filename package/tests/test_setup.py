@@ -94,7 +94,7 @@ def test_utf8_output_does_not_fail():
 
 def test_setup_removes_old_token_when_url_changes(monkeypatch):
     from avflow.config import TicketConfig
-    answers = iter(["https://redmine.enclave.vn/redmine", "y"])
+    answers = iter(["https://redmine.enclave.vn", "y"])
     monkeypatch.setattr("builtins.input", lambda *_: next(answers))
     monkeypatch.setattr(cli.getpass, "getpass", lambda *_: "new-key")
 
@@ -106,8 +106,8 @@ def test_setup_removes_old_token_when_url_changes(monkeypatch):
     monkeypatch.setattr(cli, "set_secret", lambda p, u, tok: stored.append(u))
     monkeypatch.setattr(cli, "delete_secret", lambda p, u: deleted.append(u))
     t = cli.setup_tickets_redmine(TicketConfig(url="https://redmine.enclave.com"))
-    assert t.url == "https://redmine.enclave.vn/redmine"
-    assert stored == ["https://redmine.enclave.vn/redmine"] and deleted == ["https://redmine.enclave.com"]
+    assert t.url == "https://redmine.enclave.vn"
+    assert stored == ["https://redmine.enclave.vn"] and deleted == ["https://redmine.enclave.com"]
 
 
 def test_setup_keeps_token_when_url_unchanged(monkeypatch):
@@ -123,7 +123,7 @@ def test_setup_keeps_token_when_url_unchanged(monkeypatch):
     deleted = []
     monkeypatch.setattr(cli, "set_secret", lambda *a: None)
     monkeypatch.setattr(cli, "delete_secret", lambda p, u: deleted.append(u))
-    cli.setup_tickets_redmine(TicketConfig(url="https://redmine.enclave.vn/redmine"))
+    cli.setup_tickets_redmine(TicketConfig(url="https://redmine.enclave.vn"))
     assert deleted == []
 
 
