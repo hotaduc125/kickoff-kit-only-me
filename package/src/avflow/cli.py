@@ -533,8 +533,8 @@ def cmd_init(args) -> int:
           "  1. .avflow/project.toml: review the risk areas, add the project's own (payments, authentication, …) and\n"
           "     owners; then `avflow risk check` and `avflow risk sync` (CODEOWNERS).\n"
           "  2. Fill the TODOs in CLAUDE.md; add terms to docs/CONTEXT.md.\n"
-          "  3. GitLab CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY, and AVFLOW_GITLAB_TOKEN (project access token,\n"
-          "     Reporter, read_api) for avflow-risk-check.\n"
+          "  3. GitLab CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY (protected), REDMINE_READ_API_KEY (read-only account,\n"
+          "     not protected) and AVFLOW_GITLAB_TOKEN (project access token, Reporter, read_api) for avflow-risk-check.\n"
           "  4. Commit everything in a merge request.")
     return 0
 

@@ -86,14 +86,14 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 
 - Version **3.0.0** in the repository (not yet released). Releases to the marketplace may lag; check `git tag` and GitHub Releases.
 - **avflow 3.0** — one flow and project-defined risk (`docs/design/avflow-3.0.md`). Decisions answered (see
-  `docs/decisions.md`; the GitLab tier is still open). **Phases 1–3 done** on branch `avflow-3.0-phase1`: profile and
+  `docs/decisions.md`; Enclave's GitLab is Free). **Phases 1–3 done** on branch `avflow-3.0-phase1`: profile and
   validation (`risk.py`, standard library only — CI uses a copy), the ticket's risk area,
   `start_ticket` without Mode, `assess_plan`, `review_requirements`, `avflow risk check/files/sync/suggest`, stack presets
   (`data/presets.toml`), CODEOWNERS block, MR checklist section, CI gate `avflow-risk-check`; generic words in skills
   (guarded by `tests/test_skill_words.py`), the *Test environments and languages* section in the `CLAUDE.md` template,
   the sandbox profile example and project skill, the risk section of
   `avflow report`. Next: the pilot (test plan on the real Redmine/GitLab), then decide whether the gate fails by default.
-- Before the pilot, still open: GitLab tier of gitlab.enclave.vn; the Redmine CI variables are *Protected* and do not
-  reach MR pipelines from feature branches.
+- Before the pilot: IT must create the read-only Redmine account `ci-reader` for `REDMINE_READ_API_KEY` (decided
+  Nov 13); until then the CI gate reads the diff only and test E14 waits.
 - Known gaps: no GitHub Actions CI for this repository yet (the root `.gitlab-ci.yml` is a leftover); Windows scripts
   only partly tested (`docs/WINDOWS_TEST.md` is current for 3.0 but not yet run on a Windows PC); `avflow report` not yet run against the real Redmine/GitLab.

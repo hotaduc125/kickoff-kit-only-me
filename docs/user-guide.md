@@ -349,11 +349,18 @@ Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and 
 
 | Variable | Value |
 | --- | --- |
-| `REDMINE_URL` | The same Redmine address as in `avflow setup` |
-| `REDMINE_CI_API_KEY` | The API key of a **dedicated CI account** in Redmine (masked, protected). Give it *View private notes* if CI should see the checks recorded at start and plan |
+| `REDMINE_URL` | The same Redmine address as in `avflow setup` (not protected: it is not a secret, and merge request pipelines need it) |
+| `REDMINE_CI_API_KEY` | The API key of a **dedicated CI account** in Redmine (masked, **protected**) — moves tickets to *Ready for test* after a merge |
+| `REDMINE_READ_API_KEY` | The API key of a **read-only CI account** (masked, **not protected**) — lets `avflow-risk-check` read the ticket in merge request pipelines. Its role has only *View issues* and *View private notes* |
 | `AVFLOW_GITLAB_TOKEN` | A **project access token** (Settings → Access tokens; role Reporter, scope `read_api`; masked) — lets `avflow-risk-check` read approvals, notes and the description |
 
 **The CI account** is an ordinary Redmine user created only for CI (for example `ci-bot`), member of the project with the team role. Its notes show as written by CI, its key can be reset without affecting anyone, and CI keeps working when people change. Do not use a person's key in a real project: anyone with Maintainer access in GitLab can read CI variables. If there is no CI account yet, remove the `avflow-ready-for-test` job and move tickets to *Ready for test* by hand.
+
+**The read-only account** (for example `ci-reader`) exists because merge request pipelines run on unprotected
+branches: anyone who can push a branch — a person or an agent — could change the CI file and read every variable that
+pipeline gets. So the key with write rights stays protected, and the merge request pipeline gets a key that can only
+read. Without `REDMINE_READ_API_KEY`, `avflow-risk-check` cannot read the ticket and judges by the changed files only
+(it says so in its log); the risk areas named on the ticket are still enforced when the agent starts and plans.
 
 ## For the PM
 

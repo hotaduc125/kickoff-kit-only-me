@@ -52,9 +52,12 @@ class Sources:
         return self.gitlab(f"/projects/{self.env['CI_PROJECT_ID']}/merge_requests/{self.env['CI_MERGE_REQUEST_IID']}{suffix}")
 
     def redmine(self, path: str):
-        url, key = self.env.get("REDMINE_URL"), self.env.get("REDMINE_CI_API_KEY")
+        # MR pipelines run on unprotected branches: prefer a read-only key (unprotected variable) over the protected key
+        # of the CI account that writes to Redmine after a merge.
+        url = self.env.get("REDMINE_URL")
+        key = self.env.get("REDMINE_READ_API_KEY") or self.env.get("REDMINE_CI_API_KEY")
         if not url or not key:
-            raise PermissionError("REDMINE_URL / REDMINE_CI_API_KEY not set")
+            raise PermissionError("REDMINE_URL / REDMINE_READ_API_KEY not set in this pipeline")
         return self.http(url.rstrip("/") + path, {"X-Redmine-API-Key": key})
 
 

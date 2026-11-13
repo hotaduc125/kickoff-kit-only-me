@@ -1,6 +1,6 @@
 # avflow 3.0 — Design: one flow, project-defined risk
 
-Status: **accepted** — decisions answered Nov 13, 2026 (GitLab tier still open); phases 1–3 built on branch `avflow-3.0-phase1`, version 3.0.0 · Nov 12, 2026 · Alvin
+Status: **accepted** — decisions answered Nov 13, 2026 (Enclave's GitLab: Free); phases 1–3 built on branch `avflow-3.0-phase1`, version 3.0.0 · Nov 12, 2026 · Alvin
 Source: Claude Docs design doc (exported). This file is now the reference for implementation.
 
 ## Summary
@@ -152,7 +152,7 @@ Projects compose risk areas from a **fixed list of checks**; avflow implements e
 
 **The CI job `avflow-risk-check`** (added by `avflow init`) is what turns the list into a gate. On every merge request pipeline it reads the profile, matches the changed files, and fails with a clear message when a required check is missing — so a risky change cannot merge with an unticked checklist, no review result or no owner approval.
 
-**Open point — GitLab tier.** Required code-owner approval is a GitLab **Premium** feature. On GitLab Free, CODEOWNERS shows the owners but does not block the merge; the `avflow-risk-check` job then provides the block by reading the MR's approvals through the API. To confirm on Enclave's GitLab before implementation.
+**GitLab tier.** Required code-owner approval is a GitLab **Premium** feature. On GitLab Free, CODEOWNERS shows the owners but does not block the merge; the `avflow-risk-check` job then provides the block by reading the MR's approvals through the API (with `gate = "fail"` and *Pipelines must succeed*). Enclave's GitLab is **Free** (confirmed Nov 13, 2026), so this job is the only code-owner gate there.
 
 ## Where settings live
 
@@ -252,7 +252,7 @@ The design trades an early, explicit choice for checks driven by facts; these ar
 | Paths drawn too wide | Every change needs extra checks; people stop reading them | `avflow risk files` shows the effect before merging the profile; start narrow, widen with evidence |
 | The plan names no risky file but the diff touches one | No stop for plan confirmation; checks arrive only at review | Review still blocks the merge; the miss is reported so the profile or the plan quality can improve |
 | No upfront moment to think | Less deliberate start than the old FULL | A short plan note is mandatory for every ticket; risky areas can require `plan-confirmation` |
-| The CI gate depends on GitLab APIs and the tier | Owner approval may be checkable only through the API on GitLab Free | Verify before building; until then the job reports instead of failing |
+| The CI gate depends on GitLab APIs and the tier | Owner approval may be checkable only through the API on GitLab Free | Built on the API (works on Free and Premium); Enclave is Free, so the job is the gate |
 | More files to understand (`project.toml`) | One more concept for project leads | `avflow init` writes commented examples and the preset areas; one page in the user guide |
 
 What is **not** traded: the ticket rules in code, the guardrails, the secret scans, tests in every change and a person's review all stay as they are.
@@ -268,7 +268,7 @@ Answered Nov 13, 2026 — see `docs/decisions.md` (3.0).
 - [x] Approve removing the four modes (one flow for every ticket). — **Yes.**
 - [x] Ticket field for the risk area. — **Both: list field when it exists, `Risk area:` line otherwise.** (A Machine-side mapping was built in phase 1 and removed before release: avflow stays project-neutral.)
 - [x] Should the CI gate **fail** the pipeline from the start, or **report only** during the pilot? — **Report only in the pilot.**
-- [ ] Check Enclave's GitLab tier: is required code-owner approval available (Premium), or must the CI job check approvals? — **Open**; build the API check.
+- [x] Check Enclave's GitLab tier: is required code-owner approval available (Premium), or must the CI job check approvals? — **Free: the CI job checks approvals through the API.**
 - [x] Is a mandatory short plan note acceptable for every ticket, including one-line changes? — **Yes.**
 - [x] Strict default for new projects: which checks, and for how long by default? — **Plan confirmation + independent review, 6 weeks.**
 - [x] Which stack presets ship first? — **All five; no organisation- or project-specific preset.**

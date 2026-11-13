@@ -5,6 +5,28 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
+## A read-only Redmine key for merge request pipelines (Nov 13, 2026)
+
+- `avflow-risk-check` reads the ticket with **`REDMINE_READ_API_KEY`** (masked, **not protected**), the key of a
+  read-only Redmine account (`ci-reader`; role with only *View issues* + *View private notes*). It falls back to
+  `REDMINE_CI_API_KEY` when the read key is not set, so existing projects keep working. `REDMINE_URL` is no longer
+  protected (not a secret). `ci-bot`'s write key stays protected and is used only after a merge.
+- *Why:* MR pipelines run on unprotected branches, so they never see protected variables. Unprotecting `ci-bot`'s key
+  would hand a **write** key to every branch pipeline — anyone who can push a branch, including an agent, could change the
+  CI file and take it; it could then change statuses and write public notes in a Redmine the customer shares. A leaked
+  read-only key changes nothing. Rejected: unprotect `ci-bot` (write risk), diff-only gate (misses ticket-only areas).
+- *Until IT creates `ci-reader`:* the pilot runs without it (the job reads the diff only and says so); E14 waits, or runs
+  once in `avflow-sandbox` with `ci-bot`'s key unprotected for the session, then re-protected and reset in Redmine.
+
+## Enclave's GitLab is Free: the CI job is the code-owner gate (Nov 13, 2026)
+
+- `gitlab.enclave.vn` runs **GitLab Free** (checked by the PM). GitLab itself cannot require code-owner approval there;
+  `avflow-risk-check` reads the MR approvals through the API (`AVFLOW_GITLAB_TOKEN`, `read_api`) — already built in
+  phase 2, so no code change. Closes the open "GitLab tier" decision.
+- *Consequences:* during the pilot (`gate = "report"`) nothing blocks a merge without an owner's approval — the job only
+  reports it; blocking needs `gate = "fail"` plus *Pipelines must succeed*, the decision after the pilot. An approval
+  does not start a pipeline, so owners re-run the job after approving (already in the user guide and skills).
+
 ## avflow is project-neutral: Machine-side removed, no project or customer in avflow (Nov 13, 2026)
 
 - **avflow serves any software project**; no project or customer (Mateo, WKKM, …) may appear in its code, defaults,
@@ -62,7 +84,7 @@ Newest decisions first. Add an entry whenever a session decides something (date 
   `AVFLOW_GITLAB_TOKEN`, a project access token with `read_api`); `checklist:` → ticked in the avflow section of the MR
   description; `plan-confirmation` → happens in the session, listed but not checkable in CI. Known limits: the review note
   and the ticks cannot prove who wrote them; approving does not re-run the pipeline (re-run the job).
-- **Open — Redmine key in MR pipelines.** `REDMINE_URL` / `REDMINE_CI_API_KEY` are set *Protected*, so they do not
+- **Open — Redmine key in MR pipelines** (decided Nov 13: a read-only key, see above). `REDMINE_URL` / `REDMINE_CI_API_KEY` are set *Protected*, so they do not
   reach MR pipelines from feature branches: the gate then falls back to the diff ("could not be read"). Options: unprotect
   them (the CI key reaches every MR pipeline), add a separate read-only Redmine key for the gate, or accept a diff-only
   gate. To decide before the pilot.

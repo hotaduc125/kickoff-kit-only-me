@@ -1,7 +1,10 @@
 # avflow jobs — include from .gitlab-ci.yml with:
 #   include:
 #     - local: .gitlab-ci.avflow.yml
-# CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY (masked, protected; a dedicated CI account),
+# CI/CD variables: REDMINE_URL (not protected — it is not a secret), REDMINE_CI_API_KEY (masked, protected; a
+#   dedicated CI account that moves tickets after a merge), REDMINE_READ_API_KEY (masked, NOT protected; a separate
+#   read-only account — role with only View issues + View private notes — so avflow-risk-check can read the ticket in
+#   merge request pipelines; without it, that job falls back to REDMINE_CI_API_KEY where available),
 #   AVFLOW_GITLAB_TOKEN (masked; a project access token, role Reporter, scope read_api — lets avflow-risk-check read
 #   the MR's approvals, notes and description).
 # avflow-risk-check lists the checks a merge request needs (risk areas in .avflow/project.toml, read from the TARGET

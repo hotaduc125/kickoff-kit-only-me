@@ -89,12 +89,12 @@ Bỏ qua mục 0.1a bên dưới nếu dùng cách này.
 
    | Key | Value | Masked | Protected |
    |---|---|---|---|
-   | `REDMINE_URL` | Địa chỉ gốc Redmine, **giống hệt** URL dùng trong `avflow setup`: `https://redmine.enclave.vn` | Không (URL không cần che, và GitLab thường không che được chuỗi có `:` `/`) | Có |
+   | `REDMINE_URL` | Địa chỉ gốc Redmine, **giống hệt** URL dùng trong `avflow setup`: `https://redmine.enclave.vn` | Không (URL không cần che, và GitLab thường không che được chuỗi có `:` `/`) | **Không** — không phải bí mật, và pipeline MR (E14) cũng cần |
    | `REDMINE_CI_API_KEY` | **API key của tài khoản `ci-bot`**: đăng nhập Redmine bằng `ci-bot` → **My account** → cột phải **API access key** → **Show** (hoặc **Reset** nếu chưa có) → copy chuỗi 40 ký tự | **Có** | Có |
 
    Cách thêm: project trên GitLab → **Settings → CI/CD → Variables → Expand → Add variable** → điền **Key** và **Value** → đánh dấu **Protect variable** (và **Mask variable** cho API key) → **Add variable**. Làm lần lượt cho hai biến.
 
-   - **Protect variable** nghĩa là biến chỉ có trong pipeline của **nhánh được bảo vệ**. Job này chỉ chạy khi push vào `develop` (đã bảo vệ ở bước 2), nên đúng như mong muốn; pipeline của nhánh feature không cần và không thấy API key.
+   - **Protect variable** nghĩa là biến chỉ có trong pipeline của **nhánh được bảo vệ**. Job này chỉ chạy khi push vào `develop` (đã bảo vệ ở bước 2), nên key của `ci-bot` (có quyền **ghi**) giữ *Protected*: pipeline của nhánh feature không thấy nó.
    - **Không có tài khoản `ci-bot`** (chưa có admin để tạo): tạm dùng **API key của chính bạn** cho buổi test, nhưng khi đó các ghi chú do CI viết sẽ đứng tên bạn, và key của bạn nằm trong GitLab. Sau khi test xong, **Reset** key của bạn trong Redmine và nhờ admin tạo `ci-bot` cho dự án thật.
    - Tên trạng thái **không cần** biến CI: `avflow init` ghi chúng từ cấu hình của team vào `.gitlab-ci.avflow.yml` (kiểm tra ở B1).
 
@@ -107,9 +107,20 @@ Bỏ qua mục 0.1a bên dưới nếu dùng cách này.
    |---|---|---|---|
    | `AVFLOW_GITLAB_TOKEN` | Project access token (Reporter, `read_api`) | **Có** | **Không** |
 
-   - **Đọc ticket trong pipeline MR:** job `avflow-risk-check` cũng đọc ticket ở tiêu đề MR (vùng rủi ro, các check đã ghi ở start/plan) bằng `REDMINE_URL` / `REDMINE_CI_API_KEY`. Hai biến này đang **Protected** nên **không có** trong pipeline MR: job khi đó ghi *"Ticket #… could not be read (REDMINE_URL / REDMINE_CI_API_KEY not set); only the diff counts for it."* Để thử E14, tạm **bỏ Protected** của hai biến trong buổi test (cân nhắc: key của `ci-bot` khi đó có trong mọi pipeline MR — vẫn được che trong log), rồi bật lại sau.
-   - **Tài khoản `ci-bot` xem được private note** (role có *View private notes*) thì job mới biết các check đã ghi ở bước *start* / *plan*; nếu không, job ghi chú *"No private [avflow] notes visible…"* (E14).
-   - **GitLab Premium** (nếu có): bật thêm **Settings → Merge requests → Approval rules → Code owner approval** trên `develop`. Trên GitLab Free, CODEOWNERS chỉ hiển thị chủ sở hữu; việc chặn do `avflow-risk-check` làm (E9, E11).
+   **Biến thứ tư — `REDMINE_READ_API_KEY`** (cho job `avflow-risk-check` đọc ticket trong pipeline MR, phần E14): API key của một tài khoản Redmine **chỉ đọc**, ví dụ **`ci-reader`**. Cần admin Redmine (IT) tạo:
+   1. **Administration → Roles → New role** `CI reader`: chỉ tick **View issues** và **View private notes**.
+   2. **Administration → Users → New user** `ci-reader`; thêm vào project `avflow-test` (và mọi project dùng avflow) với role `CI reader`.
+   3. Đăng nhập bằng `ci-reader` → **My account → API access key** → copy.
+   4. GitLab: Key `REDMINE_READ_API_KEY`, **Mask: Có**, **Protect: Không** (pipeline MR chạy trên nhánh feature).
+
+   | Key | Value | Masked | Protected |
+   |---|---|---|---|
+   | `REDMINE_READ_API_KEY` | API key của `ci-reader` (chỉ đọc) | **Có** | **Không** |
+
+   - *Vì sao không dùng `ci-bot`:* bỏ Protected thì key **ghi** của `ci-bot` có trong mọi pipeline MR — ai push được nhánh (kể cả agent) đều có thể sửa `.gitlab-ci.yml` để lấy key. Key của `ci-reader` lộ ra thì chỉ **đọc** được, không sửa gì.
+   - **Chưa có `ci-reader`** (chờ IT): job ghi *"Ticket #… could not be read (REDMINE_URL / REDMINE_READ_API_KEY not set in this pipeline); only the diff counts for it."* và chỉ xét diff — cứ chạy các phần khác, để **E14** lại. Nếu cần chạy E14 trước: **chỉ trong `avflow-sandbox`**, tạm bỏ Protected của `REDMINE_CI_API_KEY` (job dùng nó khi chưa có `REDMINE_READ_API_KEY`), chạy E14, rồi bật lại Protected **và Reset key của `ci-bot` trong Redmine**, cập nhật biến bằng key mới.
+   - **Tài khoản đọc ticket xem được private note** (*View private notes*) thì job mới biết các check đã ghi ở bước *start* / *plan*; nếu không, job ghi chú *"No private [avflow] notes visible…"* (E14).
+   - `gitlab.enclave.vn` là **GitLab Free**: không có tuỳ chọn *Code owner approval*; CODEOWNERS chỉ hiển thị chủ sở hữu, việc chặn do `avflow-risk-check` làm (E9, E11). *(Trên GitLab Premium: bật thêm **Code owner approval** trên `develop`.)*
 5. **Integrations → Redmine** *(tuỳ chọn, nhưng nên có)*: giúp `#123` trong tiêu đề MR và commit **tự thành link** sang ticket Redmine. avflow vẫn chạy được nếu bỏ qua bước này.
 
    Vào **Settings → Integrations → Redmine**, bật **Active**, rồi điền:
@@ -349,7 +360,7 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
   - `CLAUDE.md` có mục **Test environments and languages** (môi trường kiểm thử, ngôn ngữ giao diện, skill của dự án — đều là `TODO`).
   - `CODEOWNERS`: phần chú thích đầu file và khối `# >>> avflow risk areas … # <<< avflow risk areas` với dòng *"No risk area has owners yet …"*; không còn dòng `TODO`.
   - `.gitlab-ci.avflow.yml`: job `avflow-ready-for-test` có `AVFLOW_STATUS_IN_REVIEW: "In Code Review"` và `AVFLOW_STATUS_READY_FOR_TEST: "Ready for testing"`; job mới **`avflow-risk-check`** (stage `.post`, rule `merge_request_event` với `when: always`) có `GIT_DEPTH: "0"`, `AVFLOW_FIELD_RISK_AREA: "Risk area"` (không có biến nào khác về trường ticket); không còn chỗ giữ chỗ `{…}`.
-  - Phần *Next* nhắc: xem lại vùng rủi ro và owners, `avflow risk check`, `avflow risk sync`, biến CI `REDMINE_URL`, `REDMINE_CI_API_KEY`, **`AVFLOW_GITLAB_TOKEN`**.
+  - Phần *Next* nhắc: xem lại vùng rủi ro và owners, `avflow risk check`, `avflow risk sync`, biến CI `REDMINE_URL`, `REDMINE_CI_API_KEY` (protected), **`REDMINE_READ_API_KEY`** (không protected), **`AVFLOW_GITLAB_TOKEN`**.
 - **Thử thêm — `--stack`:** trong một thư mục trống `mkdir /tmp/stacktest && cd /tmp/stacktest && avflow init --stack dotnet,node` → `Stack presets: dotnet, node`; vùng *Dependencies* gộp đường dẫn của cả hai (`**/*.csproj`, `package-lock.json`, …); các vùng gợi ý *Native interop*, *Installers*, *Schema*, *Build tooling* xuất hiện **dạng comment**. `avflow init --stack cobol` → ❌ *"Unknown stack: cobol (known: dotnet, go, java, node, python)"*, mã thoát 1. Dọn: `rm -rf /tmp/stacktest`.
 
 ### B2. Không ghi đè
@@ -614,8 +625,8 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 
 ### E14. Job đọc ticket từ Redmine (vùng rủi ro, check từ kế hoạch)
 
-- **Điều kiện:** pipeline MR có `REDMINE_URL` / `REDMINE_CI_API_KEY` (tạm bỏ *Protected*, xem 0.2 bước 4); `gate = "report"`.
-- **Các bước:** (1) tạm sửa dòng *Size and mode* của T2 thành `Risk area: Payments`, mở một MR nhỏ chỉ sửa `src/sandbox/report.py`, tiêu đề `Refs #<T2>`. (2) Với T8: kế hoạch nêu `src/sandbox/machine.py` (`assess_plan` → stop, check của *Machine control*), nhưng diff cuối cùng **không** sửa file đó. (3) Lặp lại (2) khi tài khoản `ci-bot` **không** có quyền xem private note. (4) Đặt lại *Protected* cho hai biến Redmine, chạy lại job.
+- **Điều kiện:** pipeline MR có `REDMINE_URL` và `REDMINE_READ_API_KEY` của `ci-reader` (không Protected, xem 0.2 bước 4 — hoặc cách tạm thời ở đó); `gate = "report"`.
+- **Các bước:** (1) tạm sửa dòng *Size and mode* của T2 thành `Risk area: Payments`, mở một MR nhỏ chỉ sửa `src/sandbox/report.py`, tiêu đề `Refs #<T2>`. (2) Với T8: kế hoạch nêu `src/sandbox/machine.py` (`assess_plan` → stop, check của *Machine control*), nhưng diff cuối cùng **không** sửa file đó. (3) Lặp lại (2) khi role `CI reader` **không** có quyền xem private note. (4) Tạm đổi Key `REDMINE_READ_API_KEY` thành `REDMINE_READ_API_KEY_OFF`, chạy lại job (`REDMINE_CI_API_KEY` vẫn Protected nên không tới được job); rồi đổi lại.
 - **Kết quả mong đợi:** (1) *"Payments (ticket)"*, ❌ Independent review, *Profile gaps* có `src/sandbox/report.py`. (2) *"Machine control (plan)"* và đủ check của vùng dù diff không chạm vùng — check chỉ tăng. (3) *"Note: No private [avflow] notes visible: checks recorded at start and plan are not known to CI …"*; ghi chú **công khai** `[avflow] required …` (D10b) **không** được tính. (4) *"Ticket #… could not be read …; only the diff counts for it."* Dọn: trả lại dòng *Size and mode* của T2.
 
 ---

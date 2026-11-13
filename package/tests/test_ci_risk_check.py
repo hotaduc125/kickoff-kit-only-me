@@ -60,7 +60,7 @@ class World:
 
     def http(self, url, headers):
         if url.startswith("https://redmine.test/issues/12.json"):
-            assert headers == {"X-Redmine-API-Key": "k"}
+            self.redmine_keys = getattr(self, "redmine_keys", []) + [headers["X-Redmine-API-Key"]]
             return {"issue": self.issue}
         assert headers == {"PRIVATE-TOKEN": "t"}
         if url == MR_PATH:
@@ -168,6 +168,27 @@ def test_profile_is_read_from_the_target_branch_only():
 def test_no_profile_on_target_passes():
     code, out = World(gate="fail", profile=False).run()
     assert code == 0 and "nothing to check" in out
+
+
+def test_read_only_key_is_preferred_for_redmine():
+    """MR pipelines run on unprotected branches: a separate read-only key, not the protected ci-bot key (decisions)."""
+    w = World(files=["README.md"])
+    w.env["REDMINE_READ_API_KEY"] = "read-only"
+    w.run()
+    assert w.redmine_keys == ["read-only"]
+
+
+def test_ci_key_is_the_fallback_when_no_read_only_key():
+    w = World(files=["README.md"])
+    w.run()
+    assert w.redmine_keys == ["k"]
+
+
+def test_missing_keys_name_both_variables():
+    w = World(files=["README.md"])
+    del w.env["REDMINE_CI_API_KEY"]
+    code, out = w.run()
+    assert "REDMINE_READ_API_KEY" in out and "only the diff counts" in out
 
 
 def test_unreadable_ticket_falls_back_to_the_diff():
