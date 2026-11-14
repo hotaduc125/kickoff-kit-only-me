@@ -81,4 +81,4 @@ suggest `avflow check`; do not silently skip the step.
 
 - Tickets are read and written **only** through the `tickets` skill (avflow-tickets MCP server). No other skill may create, publish or comment on tickets.
 - Plans go through `assess_plan`; findings and handoffs are **private notes** on the ticket.
-- Git safety guardrails may block some commands (push to protected branches, force push, `reset --hard`, …). If a command is blocked, do not try to work around it — tell the person.
+- Git safety guardrails may block some commands (push to protected branches, force push, `reset --hard`, merging or approving a merge request with `glab` / `gh`, …). If a command is blocked, do not try to work around it — tell the person.
