@@ -27,7 +27,8 @@ The repository owner is the PM (Alvin). Members install releases; they never see
 | `plugin/` | The Claude Code plugin marketplace source: team skills and commands (`plugins/avflow/`) |
 | `team/avflow-team.toml` | **Team settings** for Enclave (URL, statuses, fields, workflow, models, monitor) — embedded into each release |
 | `scripts/` | `release.py`, `bootstrap.sh` / `.ps1` (install), `reset-avflow.sh` / `.ps1` (remove every trace, including old names) |
-| `docs/` | Decisions, designs, user guide, test plan, Windows test checklist |
+| `docs/` | Decisions, designs, user guide, test plan, Windows test checklist, overview (`avflow-overview.md`) |
+| `CHANGELOG.md` | What changed in each release, for members (newest first) |
 | `examples/avflow-sandbox/` | Small sample project (Python) with ready-made test tickets, a profile example and a sample project skill, used by the test plan |
 
 ## Commands
@@ -71,7 +72,7 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
   describe judgement and call the tools.
 - **Tests first** for behaviour changes; use `fake_redmine.py` and fake runners (`runner=lambda c, interactive=False: …`)
   instead of real services.
-- **Docs move with behaviour:** update `INSTALL.md`, `package/README.md`, `plugin/README.md`, `docs/user-guide.md`,
+- **Docs move with behaviour:** add the change to `CHANGELOG.md` (under the next version), and update `INSTALL.md`, `package/README.md`, `plugin/README.md`, `docs/user-guide.md`,
   `docs/test-plan.md` and, when relevant, `docs/WINDOWS_TEST.md` in the same change.
 - **Record decisions** in `docs/decisions.md` (newest first) whenever a session decides something.
 
