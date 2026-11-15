@@ -1,6 +1,6 @@
 # avflow user guide (macOS & Windows)
 
-For avflow **3.0.0**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
+For avflow **3.0.1**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
 the same change as any behaviour it describes.
 
 ## What avflow is
@@ -41,7 +41,7 @@ No `uv`? No problem: the install script installs it.
 
 Download the release files into one folder, run the install script, enter your token; about 10 minutes.
 
-**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.0`):
+**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.1`):
 
 ```bash
 gh release download v<version> --repo alvin-enc/avflow-marketplace

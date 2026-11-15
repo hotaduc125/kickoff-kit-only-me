@@ -3,7 +3,9 @@
 What changed in each avflow release, newest first. Why things changed is in `docs/decisions.md`; releases before
 3.0.0 are described there by version.
 
-## Unreleased
+## 3.0.1 — Nov 15, 2026
+
+Upgrading from 3.0.0: `avflow update` — no setup needed. From 2.6.x: follow the 3.0.0 steps below.
 
 ### Security
 

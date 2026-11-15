@@ -1,8 +1,8 @@
-<!-- Test plan for avflow 3.0.0 (phase 1: one flow, project-defined risk; phase 2: CI gate avflow-risk-check, CODEOWNERS sync, stack presets in init, risk suggest; phase 3: generic skills and project skills, sandbox profile example, risk section in avflow report), written in Vietnamese for the PM. Keep it in step with behaviour. -->
+<!-- Test plan for avflow 3.0.1 (phase 1: one flow, project-defined risk; phase 2: CI gate avflow-risk-check, CODEOWNERS sync, stack presets in init, risk suggest; phase 3: generic skills and project skills, sandbox profile example, risk section in avflow report), written in Vietnamese for the PM. Keep it in step with behaviour. -->
 
 # Kế hoạch kiểm thử avflow (end-to-end)
 
-Phiên bản áp dụng: **avflow 3.0.0** (một luồng cho mọi ticket, vùng rủi ro do dự án định nghĩa; job CI `avflow-risk-check`, CODEOWNERS sinh từ hồ sơ, preset theo stack trong `avflow init`; skill của team dùng từ chung, chi tiết riêng nằm trong skill của dự án; mục rủi ro trong `avflow report`) · Môi trường: Redmine của Enclave, GitLab của Enclave (có runner), macOS (Windows xem `WINDOWS_TEST.md`).
+Phiên bản áp dụng: **avflow 3.0.1** (guardrails cho `gh` / `glab`; một luồng cho mọi ticket, vùng rủi ro do dự án định nghĩa; job CI `avflow-risk-check`, CODEOWNERS sinh từ hồ sơ, preset theo stack trong `avflow init`; skill của team dùng từ chung, chi tiết riêng nằm trong skill của dự án; mục rủi ro trong `avflow report`) · Môi trường: Redmine của Enclave, GitLab của Enclave (có runner), macOS (Windows xem `WINDOWS_TEST.md`).
 
 Mục tiêu: chạy avflow qua **một vòng đời phát triển thật** — từ cài đặt, khởi tạo dự án, làm ticket, CI, review, merge, phát hành, đến xử lý sự cố và báo cáo — và xác nhận **các quy tắc an toàn** thật sự chặn được những gì cần chặn.
 
@@ -289,12 +289,12 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
 
 - **Mục đích:** một thành viên mới cài được bằng một script.
 - **Các bước:**
-  1. `gh release download v3.0.0 --repo alvin-enc/avflow-marketplace` vào một thư mục trống.
-  2. `chmod +x bootstrap.sh && ./bootstrap.sh ./avflow-3.0.0-py3-none-any.whl`
+  1. `gh release download v3.0.1 --repo alvin-enc/avflow-marketplace` vào một thư mục trống.
+  2. `chmod +x bootstrap.sh && ./bootstrap.sh ./avflow-3.0.1-py3-none-any.whl`
   3. Setup in **Team settings** (Redmine, GitLab, trạng thái, workflow, model, monitor) rồi chỉ hỏi **API key Redmine của bạn** (và đăng nhập GitLab nếu chưa đăng nhập).
 - **Kết quả mong đợi:**
   - Setup **không hỏi** URL, workflow, model hay ngưỡng; `✅ Connected as <tên bạn>` ngay sau khi nhập API key.
-  - Cuối setup, bảng `avflow check` toàn ✅ (dòng ➖ chỉ là thông tin), gồm: Workflow, Git guardrails hook, Context monitor, ba subagent với model opus / sonnet / opus, Plugin integrity v3.0.0.
+  - Cuối setup, bảng `avflow check` toàn ✅ (dòng ➖ chỉ là thông tin), gồm: Workflow, Git guardrails hook, Context monitor, ba subagent với model opus / sonnet / opus, Plugin integrity v3.0.1.
   - **Keychain Access** có mục chứa `avflow`; file `~/.avflow/config.toml` **không chứa** API key.
 
 ### A2. Kết nối trong Claude Code
@@ -324,7 +324,7 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
 
 ### A7. Phát hiện skill bị sửa
 
-- **Các bước:** thêm một dòng vào `…/.claude/plugins/cache/avflow/avflow/3.0.0/skills/tickets/SKILL.md`; `avflow check`; rồi trong Claude Code `/plugin uninstall avflow@avflow` và `/plugin install avflow@avflow`; `avflow check`.
+- **Các bước:** thêm một dòng vào `…/.claude/plugins/cache/avflow/avflow/3.0.1/skills/tickets/SKILL.md`; `avflow check`; rồi trong Claude Code `/plugin uninstall avflow@avflow` và `/plugin install avflow@avflow`; `avflow check`.
 - **Kết quả mong đợi:** ❌ *"Plugin integrity … modified: skills/tickets/SKILL.md"*; sau khi cài lại: ✅.
 
 ### A6b. Cấu hình của team đến mọi máy
@@ -341,10 +341,10 @@ Với các ticket khác, giữ cùng cấu trúc và thay nội dung cho phù h�
 
 ### A8. Cập nhật phiên bản
 
-- **Điều kiện:** có một bản phát hành mới hơn (ví dụ tạo bản thử 3.0.1 bằng `release.py --push`).
+- **Điều kiện:** có một bản phát hành mới hơn (ví dụ tạo bản thử 3.0.2 bằng `release.py --push`).
 - **Các bước:** `avflow update --check`; `avflow update`; mở phiên Claude Code mới.
-- **Kết quả mong đợi:** *"Update available: v3.0.1"*; `update` tải, cài, cập nhật plugin, rồi chạy `check` toàn ✅ với *"Plugin integrity: v3.0.1"*.
-- **Thử thêm — từ 2.6.2 lên 3.0.0:** trên máy còn 2.6.2, `avflow update`. `check` báo ba subagent ❌ *"edited by hand — run avflow setup"* (3.0 đổi nội dung subagent); chạy `avflow setup` → `check` toàn ✅. Mở phiên mới: skill `choose-mode` **không còn**; `/avflow:next-ticket` không hỏi Mode.
+- **Kết quả mong đợi:** *"Update available: v3.0.2"*; `update` tải, cài, cập nhật plugin, rồi chạy `check` toàn ✅ với *"Plugin integrity: v3.0.2"*.
+- **Thử thêm — từ 2.6.2 lên 3.0.1:** trên máy còn 2.6.2, `avflow update`. `check` báo ba subagent ❌ *"edited by hand — run avflow setup"* (3.0 đổi nội dung subagent); chạy `avflow setup` → `check` toàn ✅. Mở phiên mới: skill `choose-mode` **không còn**; `/avflow:next-ticket` không hỏi Mode.
 
 ---
 
