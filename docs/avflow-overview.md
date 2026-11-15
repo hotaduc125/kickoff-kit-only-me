@@ -76,7 +76,7 @@ It rests on a few beliefs:
 | **Required checks** | `plan-confirmation`, `independent-review`, `code-owner`, `checklist:<text>` — computed at start, plan and review, recorded in private notes, posted on the MR |
 | **CI gate `avflow-risk-check`** | On every MR: reads the profile from the target branch, matches the changed files, verifies the checks (review note, owner approval, ticked checklist); report-only or fail |
 | **CODEOWNERS from the profile** | `avflow risk sync` writes the owners block, so checks and code owners never drift |
-| **Git guardrails hook** | Blocks push to protected branches, force push, `reset --hard`, `clean -f`, branch force-delete, and commits that contain secrets |
+| **Git guardrails hook** | Blocks push to protected branches, force push, `reset --hard`, `clean -f`, branch force-delete, commits that contain secrets — and, through `gh` / `glab` (including their `api`), merging, approving and deleting repositories, releases, branches or branch protection |
 | **Secret scan in CI** | `avflow-secret-scan` (gitleaks) as the server-side backup of the local hook |
 | **Plugin integrity** | Checksums of the shipped skills; `avflow check` reports any skill edited by hand |
 | **Context monitor** | Warns when a session's context grows too large (answers get less reliable); `avflow usage` shows sessions and subagent calls |
@@ -149,7 +149,8 @@ on the parts of the job around the code.
 - **The customer can read Redmine.** With plain Claude Code and a Redmine key, one wrong public note is visible to the
   customer. With avflow it cannot happen: the tools only write private notes. That is enforced in code, not trusted to
   the prompt.
-- **Mistakes that hurt.** Push to `develop`, force push, `reset --hard`, a token in a commit — blocked before they
+- **Mistakes that hurt.** Push to `develop`, force push, `reset --hard`, a token in a commit, merging or approving with
+  `gh` / `glab` — blocked before they
   happen, with a clear message. A ticket that says "ignore your rules" stays data.
 - **Risky changes.** When your change touches code the project marked risky, avflow tells you *before* you write it
   (plan confirmation) and lists exactly what the MR needs (review, owner, checklist). No surprise rejection at review,
@@ -184,6 +185,7 @@ outside the model:
 |---|---|---|
 | A public note on a Redmine the customer reads | Possible: one mistake and the customer sees it | Impossible: the tool only writes private notes |
 | Push to `develop`, force push, `reset --hard` | Allowed unless you catch it | Blocked by a hook, whatever the prompt says |
+| Merging or approving an MR with `glab` / `gh` (as you) | Possible — its approval counts as yours | Blocked by the same hook |
 | A token in a commit | Possible | Blocked before the commit, and again in CI |
 | Working on a blocked ticket, or someone else's | Possible | Refused |
 | Changing risky code (payments, machine control, …) | You must know it is risky and remember the extra steps | Detected from the ticket, the plan and the diff; checks listed and verified by CI on the MR |

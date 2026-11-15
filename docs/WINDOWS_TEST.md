@@ -65,6 +65,7 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 | 3b.2 | Destructive command | `git reset --hard` | blocked |
 | 3b.3 | Feature branch | on a test feature branch: `git push -u origin <branch>` | allowed |
 | 3b.4 | Secret in a commit | add a file containing `token: ghp_` + 36 letters, stage it, ask Claude to commit | blocked; message names the file and line, never the value |
+| 3b.5 | Merge / approve through the CLI | on a test MR: `glab mr merge <iid>`, then `glab mr approve <iid>` | both blocked; `glab mr view <iid>` allowed |
 
 ## 3c. Personal settings (advanced setup)
 

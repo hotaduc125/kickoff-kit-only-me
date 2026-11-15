@@ -3,6 +3,16 @@
 What changed in each avflow release, newest first. Why things changed is in `docs/decisions.md`; releases before
 3.0.0 are described there by version.
 
+## Unreleased
+
+### Security
+
+- **Git guardrails cover `gh` and `glab`:** the agent may not merge a merge request (`gh pr merge`, `glab mr merge` /
+  `accept`), approve one (`glab mr approve`, `gh pr review --approve`), or delete a repository, release, branch or branch
+  protection — also through `gh api` / `glab api`. The agent runs these CLIs as the person, so its approval would count
+  as theirs. Viewing, notes, diffs, CI status and creating merge requests still work. Members get it with
+  `avflow update`; no setup needed.
+
 ## 3.0.0 — Nov 13, 2026
 
 avflow 3.0 replaces the four working modes with **one ticket flow**, and lets **each project define its own risk

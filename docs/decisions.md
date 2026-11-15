@@ -5,6 +5,20 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
+## Git guardrails cover the forge CLIs: no merge, approve or delete through gh / glab (Nov 14, 2026)
+
+- The guardrails hook now also reads `gh` and `glab` commands (and their `api` calls) and blocks merging a merge
+  request, approving one, and deleting a repository, release, branch or branch protection. Allowed: viewing, diffs,
+  notes, CI status and logs, creating merge requests, read-only API calls.
+- *Why:* the hook only looked at `git`, so the agent could merge a pull request with `gh pr merge` (it did, on the PM's
+  explicit request, Nov 14). Worse, the agent runs `glab` as the person: `glab mr approve` records the person's own
+  approval and could satisfy a `code-owner` check without them seeing the change. Merging and approving are a person's
+  decision (principle: the agent never merges).
+- *Consequence:* even when a person asks, the agent cannot merge or approve; the person does it in GitLab / GitHub or in
+  their own terminal (the hook only sees Claude Code's Bash tool).
+- *Limit:* a guard against mistakes and injected instructions, not a security boundary — a direct `curl` to the API with
+  a token is not caught; the CI gate and GitLab settings remain the enforcement.
+
 ## A read-only Redmine key for merge request pipelines (Nov 13, 2026)
 
 - `avflow-risk-check` reads the ticket with **`REDMINE_READ_API_KEY`** (masked, **not protected**), the key of a
