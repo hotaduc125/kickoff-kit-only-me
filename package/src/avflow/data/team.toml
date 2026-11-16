@@ -27,12 +27,16 @@ git_guardrails = true
 protected_branches = ["main", "master", "develop", "release/*"]
 
 [models]
-plan = "opus"
+plan = "sonnet"
 implement = "sonnet"
 review = "opus"
 
 [monitor]
 enabled = true
-warn_tokens = 300000
-critical_tokens = 400000
+warn_tokens = 150000
+critical_tokens = 250000
 enforce = false
+
+[guards]
+one_ticket_per_session = true        # a second start_ticket in the same session is blocked: /clear first
+max_read_kb = 200                    # reading a larger file whole is blocked (offset/limit or Grep); 0 = off

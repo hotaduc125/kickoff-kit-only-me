@@ -174,10 +174,10 @@ def _load_settings(settings_file: Path) -> dict:
         raise SystemExit(f"{settings_file} is not valid JSON — fix it and run setup again.")
 
 
-def _without_guard(pre: list) -> list:
+def _without_guard(pre: list, marker: str = GUARD_MARKER) -> list:
     out = []
     for entry in pre:
-        hooks = [h for h in entry.get("hooks", []) if GUARD_MARKER not in str(h.get("command", ""))]
+        hooks = [h for h in entry.get("hooks", []) if marker not in str(h.get("command", ""))]
         if hooks:
             out.append({**entry, "hooks": hooks})
     return out
@@ -209,8 +209,18 @@ def git_guard_installed(settings_file: Path = CLAUDE_HOME / "settings.json") -> 
     return any(GUARD_MARKER in str(h.get("command", "")) for e in data.get("hooks", {}).get("PreToolUse", []) for h in e.get("hooks", []))
 
 
+# Commands that read a stored credential (the avflow token in the OS keyring, git / gh / glab tokens). Denied in Claude
+# Code's permissions and also blocked by the guardrails hook (which sees through `bash -c`, `python -c`, …).
+DENY_RULES = ["Bash(security find-generic-password:*)", "Bash(security find-internet-password:*)",
+              "Bash(security dump-keychain:*)", "Bash(security export:*)", "Bash(cmdkey:*)", "Bash(vaultcmd:*)",
+              "Bash(secret-tool lookup:*)", "Bash(secret-tool search:*)", "Bash(keyring get:*)",
+              "Bash(python -m keyring:*)", "Bash(python3 -m keyring:*)", "Bash(git credential fill:*)",
+              "Bash(gh auth token:*)", "Bash(glab config get token:*)"]
+
+
 def merge_permissions(settings_file: Path = CLAUDE_HOME / "settings.json") -> None:
-    """Reads run freely; writes ask first. Existing settings are kept; a backup is written once."""
+    """Reads run freely; writes ask first; credential reads are denied. Existing settings are kept; a backup is
+    written once."""
     data = {}
     if settings_file.exists():
         try:
@@ -227,8 +237,66 @@ def merge_permissions(settings_file: Path = CLAUDE_HOME / "settings.json") -> No
             name = f"mcp__{MCP_NAME}__{t}"
             if name not in lst:
                 lst.append(name)
+    deny = perms.setdefault("deny", [])
+    deny.extend(r for r in DENY_RULES if r not in deny)
     settings_file.parent.mkdir(parents=True, exist_ok=True)
     settings_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def remove_deny_rules(settings_file: Path = CLAUDE_HOME / "settings.json") -> None:
+    data = _load_settings(settings_file)
+    perms = data.get("permissions") or {}
+    if "deny" not in perms:
+        return
+    perms["deny"] = [r for r in perms["deny"] if r not in DENY_RULES]
+    if not perms["deny"]:
+        perms.pop("deny")
+    settings_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+# ---------- session guards (PreToolUse on start_ticket and Read, PostToolUse on start_ticket)
+SESSION_GUARD_MARKER = "avflow-session-guard"
+START_TICKET_TOOL = f"mcp__{MCP_NAME}__start_ticket"
+SESSION_GUARD_MATCHERS = {"PreToolUse": ("Read", START_TICKET_TOOL), "PostToolUse": (START_TICKET_TOOL,)}
+
+
+def session_guard_command_path() -> str:
+    exe = "avflow-session-guard.exe" if sys.platform == "win32" else "avflow-session-guard"
+    here = Path(sys.executable).parent / exe
+    if here.exists():
+        return str(here)
+    found = which("avflow-session-guard")
+    if found:
+        return found
+    raise SystemExit("Cannot find the avflow-session-guard command. Reinstall avflow and run setup again.")
+
+
+def set_session_guard(enabled: bool, settings_file: Path = CLAUDE_HOME / "settings.json", command: str | None = None) -> None:
+    """Add (or remove) the avflow session guard hooks; other hooks are kept."""
+    data = _load_settings(settings_file)
+    hooks = data.setdefault("hooks", {})
+    cmd = (command or session_guard_command_path()) if enabled else None
+    for ev, matchers in SESSION_GUARD_MATCHERS.items():
+        entries = _without_guard(hooks.get(ev, []), SESSION_GUARD_MARKER)
+        if enabled:
+            entries += [{"matcher": m, "hooks": [{"type": "command", "command": f'"{cmd}"'}]} for m in matchers]
+        if entries:
+            hooks[ev] = entries
+        else:
+            hooks.pop(ev, None)
+    if not hooks:
+        data.pop("hooks", None)
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
+    settings_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def session_guard_installed(settings_file: Path = CLAUDE_HOME / "settings.json") -> bool:
+    try:
+        hooks = _load_settings(settings_file).get("hooks", {})
+    except SystemExit:
+        return False
+    return all(any(e.get("matcher") == m and SESSION_GUARD_MARKER in str(e.get("hooks")) for e in hooks.get(ev, []))
+               for ev, matchers in SESSION_GUARD_MATCHERS.items() for m in matchers)
 
 
 def can_read_repo(url: str, runner=run) -> bool:
@@ -252,6 +320,22 @@ def gitlab_login(host: str, runner=run) -> bool:
         return True
     code, _ = runner(["glab", "auth", "login", "--hostname", host], interactive=True)
     return code == 0
+
+
+# ---------- which avflow version last applied the team settings on this machine (see cli.apply_if_new)
+def applied_version(home: Path) -> str:
+    try:
+        return (home / "applied_version").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def record_applied(home: Path, version: str) -> None:
+    try:
+        home.mkdir(parents=True, exist_ok=True)
+        (home / "applied_version").write_text(version + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 # ---------- updates from GitHub Releases of the marketplace repository
@@ -340,7 +424,7 @@ def agents_status(models, agents_dir: Path = CLAUDE_HOME / "agents") -> list[tup
         f = agents_dir / f"{name}.md"
         want = getattr(models, role)
         if not f.exists():
-            out.append((name, False, "missing — run avflow setup"))
+            out.append((name, False, "missing — run avflow setup --apply"))
             continue
         text = f.read_text(encoding="utf-8").replace("\r\n", "\n")
         if text == agent_text(role, want):
@@ -349,7 +433,7 @@ def agents_status(models, agents_dir: Path = CLAUDE_HOME / "agents") -> list[tup
             m = re.search(r"^model:\s*(\S+)", text, re.M)
             have = m.group(1) if m else "?"
             detail = f"model is {have}, configuration says {want}" if have != want else "edited by hand"
-            out.append((name, False, detail + " — run avflow setup"))
+            out.append((name, False, detail + " — run avflow setup --apply"))
     return out
 
 

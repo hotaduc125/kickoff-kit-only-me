@@ -32,7 +32,9 @@ When the PM announces a new release, run:
 avflow update
 ```
 
-It downloads the latest release, installs it, updates the Claude Code plugin and runs the doctor. `avflow update --check` only tells you whether an update is available.
+It downloads the latest release, installs it, updates the Claude Code plugin and runs `avflow check`. The first check after an update applies the new team settings (permissions, role subagents, hooks) without questions and without touching your token; then **start a new Claude Code session**. `avflow update --check` only tells you whether an update is available; `avflow setup --apply` applies the team settings again by hand.
+
+**Updating from 3.0.x to 3.0.2:** `avflow update`, then a new Claude Code session — nothing else.
 
 **Updating from 2.x to 3.0:** run `avflow setup` once after `avflow update` (3.0 changes the role subagents, so `avflow check`
 reports them until then), and start a new Claude Code session. There are no modes any more; see the user guide.
@@ -48,7 +50,7 @@ avflow works on a standard Redmine:
 ## Team settings and personal overrides
 The PM keeps the team settings in the development repository; each release carries them, and `avflow update` brings changes to every machine. Your own file (`~/.avflow/config.toml`) holds only what you changed yourself.
 - `avflow config` shows every setting and marks your personal ones (← personal).
-- `avflow config --reset` removes your personal overrides; then run `avflow setup`.
+- `avflow config --reset` removes your personal overrides; then run `avflow setup --apply`.
 
 ## Changing your answers
 - **Ticket system, URL or token** (for example a mistyped Redmine URL): run `avflow setup` again. Your previous answers are shown in brackets — press Enter to keep them, type to change. The token is always asked again and checked; when the URL changes, the old token is removed from the keyring.
@@ -59,4 +61,4 @@ The PM keeps the team settings in the development repository; each release carri
 Run `avflow setup` again and choose the other workflow. avflow removes the one you had (Superpowers plugin or the Matt Pocock skills it installed) before installing the new one. Team skills, tickets and checks stay the same.
 
 ## If a git command is blocked
-The guardrails stop commands such as `git push origin develop`, `git reset --hard`, `gh pr merge` or `glab mr approve` and tell Claude it may not run them. This is intended: merges to protected branches happen through merge requests. If you really need such a command, run it yourself in a terminal.
+The guardrails stop commands such as `git push origin develop`, `git reset --hard`, `gh pr merge` or `glab mr approve` — also inside `bash -c`, `python -c` or an alias — and commands that read stored tokens (`security find-generic-password`, `cmdkey`, `gh auth token`, …), and tell Claude it may not run them. This is intended: merges to protected branches happen through merge requests. If you really need such a command, run it yourself in a terminal.

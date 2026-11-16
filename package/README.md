@@ -5,7 +5,7 @@ One command sets up the team's AI coding workflow on a developer's machine:
 - **ticket system** (v1: Redmine; planned: Jira, GitLab Issues, GitHub Issues) through the `avflow-tickets` MCP server —
   eleven tools, the same for every system, with the team rules enforced in code;
 - **repository and CI/CD** (v1: GitLab via `glab`; planned: GitHub via `gh`);
-- **Claude Code** with the member's **coding workflow** — **Superpowers** or a curated set of **Matt Pocock's** skills (pinned commit) — the **git guardrails** hook, Matt Pocock's `handoff` skill and the **avflow plugin**
+- **Claude Code** with the member's **coding workflow** — **Superpowers** or a curated set of **Matt Pocock's** skills (pinned commit) — the **git guardrails** and **session guards** hooks, Matt Pocock's `handoff` skill and the **avflow plugin**
   (team skills `tickets`, `workflow`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr`, commands `/avflow:next-ticket`, `/avflow:check`);
 - a final **check** (whoami on the ticket system, MCP registration, GitLab login, workflow, guardrails, plugins, skills).
 
@@ -21,10 +21,10 @@ repository), **equips** the agent (the member's coding workflow and the team ski
 | Layer | What avflow does |
 |---|---|
 | **Connect** | Ticket system through the `avflow-tickets` MCP server (token in the OS keyring); repository and CI through the official CLI (`glab`) |
-| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the member chooses (for example Opus to plan and review, Sonnet to implement) |
-| **Guard** | Ticket rules inside the MCP server (notes always private, only two status changes, …); git guardrails (also `gh` / `glab`: no merge, approve or delete), including blocking commits that contain secrets (and a GitLab CI secret scan as the server-side backup); merge requests go to review only with a green pipeline; integrity check of the installed skills |
+| **Equip** | The coding workflow each member chooses — **Superpowers** *or* a curated set of **Matt Pocock's** skills — plus the team skills (`tickets`, `workflow`, `qa-agent`, …) and three role subagents — planner, implementer, reviewer — each on the model the team chooses (by default Sonnet to plan and implement, Opus to review) |
+| **Guard** | Ticket rules inside the MCP server (notes always private, only two status changes, …); git guardrails (also `gh` / `glab`: no merge, approve or delete; also inside `bash -c`, `python -c` and aliases; no reading stored tokens), including blocking commits that contain secrets (and a GitLab CI secret scan as the server-side backup); merge requests go to review only with a green pipeline; integrity check of the installed skills |
 | **Keep in step** | `avflow check` and `avflow update`: everyone runs the same version of the workflow |
-| **Observe** | A context monitor records the context size of every session and subagent, warns before it grows past the team's thresholds, and `avflow usage` summarises it |
+| **Observe** | A context monitor records the context size of every session and subagent, warns before it grows past the team's thresholds, and `avflow usage` summarises it with daily totals; session guards keep one ticket per session and stop the agent reading a large file whole |
 
 **More than an installer.** The value is that team standards are enforced by the tools, not by each person or agent
 remembering them:
@@ -79,14 +79,14 @@ Manual alternative: `uv tool install <wheel or package>` then `avflow setup`.
 ## Commands
 | Command | |
 |---|---|
-| `avflow setup` | Enter your tokens and configure Claude Code with the team settings (safe to run again); `--advanced` asks every setting |
-| `avflow check` | Check that everything works (also tells you when an update is available) |
+| `avflow setup` | Enter your tokens and configure Claude Code with the team settings (safe to run again); `--advanced` asks every setting; `--apply` asks nothing and applies the team settings again |
+| `avflow check` | Check that everything works (also tells you when an update is available); after an update, first applies the new team settings |
 | `avflow update` | Install the latest release and update the plugin (`--check` only reports) |
 | `avflow config` | Show the settings and which are personal (never the token); `--edit`, `--path`, `--reset` (back to the team settings) |
 | `avflow init` | Add the team's standard files to a project repository (CLAUDE.md, docs/CONTEXT.md, ADR, CODEOWNERS, MR template, `.gitattributes`, `.editorconfig`, GitLab CI jobs: MR title check, secret scan with gitleaks, ticket to *Ready for test* after merge, `avflow-risk-check`) and `.avflow/project.toml` from the detected stack presets (`--stack dotnet,node,…`); never overwrites without `--force` |
 | `avflow risk check` · `files <paths…> [--area <name>]` · `sync` · `suggest` | The project's risk profile (`.avflow/project.toml`): validate it; show which areas and checks apply to files; regenerate the CODEOWNERS block and the CI copy; propose paths from profile gaps (read-only) |
 | `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the tickets referenced by the commits, marked with their risk areas |
-| `avflow usage` | Context size per session (orchestrator) and subagent calls with their models, from the context monitor |
+| `avflow usage` | Context size per session (orchestrator), subagent calls with their models and daily totals for this machine, from the context monitor |
 | `avflow report --project <id>` | Weekly PM report (read-only): progress per release, tickets over estimate, reopened tickets, the risk of the reviewed changes (high-risk share, areas found only at review, profile gaps), merge-request flow |
 | `avflow uninstall` | Remove the configuration, token and MCP registration (keeps Superpowers) |
 

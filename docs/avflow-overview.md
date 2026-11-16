@@ -76,17 +76,18 @@ It rests on a few beliefs:
 | **Required checks** | `plan-confirmation`, `independent-review`, `code-owner`, `checklist:<text>` — computed at start, plan and review, recorded in private notes, posted on the MR |
 | **CI gate `avflow-risk-check`** | On every MR: reads the profile from the target branch, matches the changed files, verifies the checks (review note, owner approval, ticked checklist); report-only or fail |
 | **CODEOWNERS from the profile** | `avflow risk sync` writes the owners block, so checks and code owners never drift |
-| **Git guardrails hook** | Blocks push to protected branches, force push, `reset --hard`, `clean -f`, branch force-delete, commits that contain secrets — and, through `gh` / `glab` (including their `api`), merging, approving and deleting repositories, releases, branches or branch protection |
+| **Git guardrails hook** | Blocks push to protected branches, force push, `reset --hard`, `clean -f`, branch force-delete, commits that contain secrets — and, through `gh` / `glab` (including their `api`), merging, approving and deleting repositories, releases, branches or branch protection. Sees through `bash -c`, `python -c`, `eval`, wrappers, substitutions and git / `gh` / `glab` aliases; blocks reading stored tokens (keyring, credential manager, `gh auth token`, …) |
 | **Secret scan in CI** | `avflow-secret-scan` (gitleaks) as the server-side backup of the local hook |
 | **Plugin integrity** | Checksums of the shipped skills; `avflow check` reports any skill edited by hand |
-| **Context monitor** | Warns when a session's context grows too large (answers get less reliable); `avflow usage` shows sessions and subagent calls |
+| **Context monitor** | Warns when a session's context grows too large (answers get less reliable); `avflow usage` shows sessions, subagent calls and daily totals |
+| **Session guards** | One ticket per Claude Code session (`/clear` between tickets); no large file read whole — both keep the context and the team's usage small |
 
 ### Keep machines in step
 
 | Command | What it does |
 | --- | --- |
 | `avflow setup` | Team settings applied; asks only for your own Redmine key (and GitLab login). `--advanced` for personal overrides |
-| `avflow check` | Everything that must work, with ✅ / ❌ and how to fix it |
+| `avflow check` | Everything that must work, with ✅ / ❌ and how to fix it; after an update, first applies the new team settings (no questions) |
 | `avflow update` | Installs the latest release and updates the plugin |
 | `avflow config` | Shows the configuration (never a token); `--edit`, `--reset` |
 | `avflow uninstall` / `reset-avflow` scripts | Clean removal (macOS and Windows) |
@@ -150,12 +151,12 @@ on the parts of the job around the code.
   customer. With avflow it cannot happen: the tools only write private notes. That is enforced in code, not trusted to
   the prompt.
 - **Mistakes that hurt.** Push to `develop`, force push, `reset --hard`, a token in a commit, merging or approving with
-  `gh` / `glab` — blocked before they
-  happen, with a clear message. A ticket that says "ignore your rules" stays data.
+  `gh` / `glab`, reading your token from the keyring — blocked before they happen (also inside `bash -c` or an alias), with a clear message. A ticket that says "ignore your rules" stays data.
 - **Risky changes.** When your change touches code the project marked risky, avflow tells you *before* you write it
   (plan confirmation) and lists exactly what the MR needs (review, owner, checklist). No surprise rejection at review,
   no "nobody told me this file was sensitive".
-- **Long sessions.** The context monitor warns before answers start to degrade.
+- **Long sessions and usage limits.** The context monitor warns before answers start to degrade; one ticket per session
+  and no whole large files keep the team inside its Claude usage limits.
 
 **What it costs you**
 

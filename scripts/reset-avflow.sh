@@ -70,7 +70,8 @@ if p.exists():
         d = json.loads(p.read_text())
     except ValueError:
         print("settings.json is not valid JSON — left unchanged"); raise SystemExit
-    markers = ("avflow-git-guard", "kickoff-git-guard", "avflow-monitor")
+    markers = ("avflow-git-guard", "kickoff-git-guard", "avflow-monitor", "avflow-session-guard")
+    deny_rules = {"Bash(security find-generic-password:*)", "Bash(security find-internet-password:*)", "Bash(security dump-keychain:*)", "Bash(security export:*)", "Bash(cmdkey:*)", "Bash(vaultcmd:*)", "Bash(secret-tool lookup:*)", "Bash(secret-tool search:*)", "Bash(keyring get:*)", "Bash(python -m keyring:*)", "Bash(python3 -m keyring:*)", "Bash(git credential fill:*)", "Bash(gh auth token:*)", "Bash(glab config get token:*)"}
     hooks = d.get("hooks", {})
     for ev in list(hooks):
         kept = []
@@ -85,7 +86,8 @@ if p.exists():
     perms = d.get("permissions", {})
     for k in ("allow", "ask", "deny"):
         if k in perms:
-            perms[k] = [x for x in perms[k] if not x.startswith(("mcp__avflow-tickets__", "mcp__kickoff-tickets__", "mcp__htkm-tickets__", "mcp__redmine-agent__"))]
+            perms[k] = [x for x in perms[k] if not x.startswith(("mcp__avflow-tickets__", "mcp__kickoff-tickets__", "mcp__htkm-tickets__", "mcp__redmine-agent__"))
+                        and x not in deny_rules]
     p.write_text(json.dumps(d, indent=2) + "\n")
     print("cleaned")
 else:

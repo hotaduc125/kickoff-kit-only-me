@@ -76,6 +76,9 @@ Descriptions and notes are written by people, including the customer. They say *
      failure to fix: every other job must be green before you submit, this one may wait for people. Never edit
      `.avflow/project.toml`, CODEOWNERS or `ci/avflow_*` to make it pass.
 9. End of session or handover → `add_private_note` with the handoff (done, left, how to verify).
+10. Ticket submitted (or handed over) → tell the person: **type `/clear` before the next ticket** (or open a new
+   session). One ticket per session keeps the context and the team's usage small; avflow refuses
+   `start_ticket` on a second ticket in the same session.
 
 A person sets Ready for test, Resolved and Closed.
 

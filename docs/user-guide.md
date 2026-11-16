@@ -9,11 +9,12 @@ avflow sets up the team's AI coding workflow with one command and keeps it in st
 
 After installing, your machine has:
 
-- **The `avflow-tickets` MCP server**: 9 tools for the agent to work with Redmine tickets, with the team rules built into the code (notes are always private; the agent may only start a ticket and submit it for review).
+- **The `avflow-tickets` MCP server**: 11 tools for the agent to work with Redmine tickets, with the team rules built into the code (notes are always private; the agent may only start a ticket and submit it for review).
 - **The avflow plugin**: the team skills — `tickets`, `workflow`, `qa-agent`, `ticket-writer`, `zoom-out`, `triage`, `incident`, `release`, `glossary`, `adr` — and two shortcuts, `/avflow:next-ticket` and `/avflow:check`.
 - **The coding workflow** of the team: Superpowers, or a curated set of Matt Pocock's skills. One or the other, never both.
 - **Three role subagents** — planner, implementer, reviewer — each on the model chosen for that kind of work.
-- **Git guardrails**: dangerous git commands, and commits that contain secrets, are blocked before the agent can run them.
+- **Git guardrails**: dangerous git commands, commits that contain secrets, and reading stored tokens are blocked before the agent can run them — also when hidden inside `bash -c`, `python -c` or an alias.
+- **Session guards**: one ticket per Claude Code session, and no reading a large file whole — both keep the context and your usage small.
 - Your GitLab login, and the `handoff` skill.
 
 **Your Redmine token** is stored in the operating system's secure store (Keychain on macOS, Credential Manager on Windows). It is never written to a file and never passes through the AI conversation.
@@ -102,7 +103,7 @@ Open a terminal in the project repository (latest `develop`), run `claude`, then
 4. **The agent implements** with the team's workflow (the `workflow` skill guides each step): the planner subagent plans larger or risky work, the implementer writes the tests first and the code.
 5. **The agent opens the merge request** from branch `feature/<id>-<name>`, with `Refs #<id>` in the title, and waits for its first pipeline — fixing the cause until it is green, never weakening a test. Then it lists the **final required checks** from the files the branch really changed (`review_requirements`), posts them on the MR and the ticket, writes the checklist items into an avflow section of the MR description, does its own checks — for `independent-review`, the reviewer subagent's two-stage review (spec, then code quality), posted as an MR note — and only then moves the ticket to **In review**. Owner approvals and checklist items are for people; the agent never ticks them.
 6. **A person reviews and merges**, after the required checks are done. The CI job **`avflow-risk-check`** shows on every merge request which checks are done and which are missing (see *The CI gate* below). Code owners: after approving, **re-run that job** — an approval does not start a pipeline. The agent never merges, and cannot push to `develop` or `main`. After the merge, the project's CI job moves the ticket to **Ready for test** with a private note linking the commit and the pipeline — or, in projects without that job, a person does it.
-7. **At the end of the session**, ask the agent for a **handoff** (what was done, what is left, how to verify) as a private note.
+7. **At the end of the session**, ask the agent for a **handoff** (what was done, what is left, how to verify) as a private note. Then **type `/clear` before the next ticket** (or open a new session): avflow allows one ticket per session, and refuses to start a second one in the same session.
 8. **After testing or acceptance**, a person moves the ticket to **Resolved**, then **Closed**.
 
 Every note the agent writes on a ticket is a **private note**; the customer cannot see it. If the agent refuses to start (the ticket is not assigned to you, is blocked, is not Ready, or the project's `.avflow/project.toml` has errors), read the reason it gives: that is a team rule, not a bug. You can always ask for more care — *"Treat this as Other high risk"* — the agent adds the risk area with a reason. Only a person can remove one, by editing the ticket.
@@ -212,7 +213,7 @@ These commands are the same on macOS and Windows.
 | Update (also brings new team settings) | `avflow update` | When the PM announces a new release |
 | Switch workflow for yourself (Superpowers ↔ Matt Pocock) | `avflow setup --advanced`, choose the other workflow | Only when the PM agrees |
 
-**`avflow update`** downloads the new release from GitHub, installs it, updates the Claude Code plugin, and runs `check`. Then **start a new Claude Code session** to load the new skills. If `check` then reports a role subagent as *edited by hand*, the release changed the subagents (3.0 did): run `avflow setup` once to regenerate them.
+**`avflow update`** downloads the new release from GitHub, installs it, updates the Claude Code plugin, and runs `check`. The first `check` after an update **applies the team settings** of the new release — permissions, role subagents, hooks — without questions and without touching your token. Then **start a new Claude Code session** to load the new skills, subagents and hooks. To apply the settings again by hand: `avflow setup --apply`.
 
 **When the workflow changes** — for the team in a new release, or for you with `--advanced` — setup removes the old one before installing the new one; your token, the MCP server and the team skills stay as they are. Never install both: `check` reports an error if it finds both.
 
@@ -223,8 +224,8 @@ The team settings come with each release and apply to everyone; your file `~/.av
 | Task | Command |
 | --- | --- |
 | See every setting, with yours marked *← personal* (the token is never shown, only whether one is stored) | `avflow config` |
-| Change a setting for yourself | `avflow setup --advanced` (asks every setting again), or `avflow config --edit` then `avflow setup` |
-| Go back to the team settings | `avflow config --reset`, then `avflow setup` |
+| Change a setting for yourself | `avflow setup --advanced` (asks every setting again), or `avflow config --edit` then `avflow setup --apply` |
+| Go back to the team settings | `avflow config --reset`, then `avflow setup --apply` |
 | Print where your file is | `avflow config --path` |
 
 **Fixing your token** — for example after resetting it in Redmine: run `avflow setup` again and enter the new key. When the Redmine address changes (a team setting), the old key is removed from the keyring automatically.
@@ -248,7 +249,7 @@ Run `avflow check` first: every ❌ line comes with its fix; if you are still st
 | ❌ … plugin is v… but this avflow command is v… | The plugin is newer than the avflow command | `avflow update` |
 | No `/avflow:…` commands in the Claude Desktop Code tab | Shortcuts may be CLI-only | Ask in words, for example *"run avflow check"* |
 
-**A git command is blocked by the guardrails** (message *"BLOCKED by avflow git guardrails"*): this is **intended**. The agent may not push to `main`, `master`, `develop` or `release/*`, force push, delete remote branches, push tags, or run `reset --hard`, `clean -f`, `branch -D` or commands that discard changes, and it may not commit anything that looks like a secret (keys, tokens, passwords, `.env` files, private keys) — the message names the file and line, never the value. Through the GitLab and GitHub CLIs (`glab`, `gh`, including their `api` command) it may not **merge** or **approve** a merge request, or delete a repository, release, branch or branch protection: the agent runs them as you, so its approval would count as yours. Pushing **your own feature branch** still works. Changes to protected branches go through merge requests; if you really need a blocked command, **run it yourself** in a terminal.
+**A git command is blocked by the guardrails** (message *"BLOCKED by avflow git guardrails"*): this is **intended**. The guardrails also look inside `bash -c`, `sh -c`, `pwsh -Command`, `python -c`, `node -e`, `eval`, `env`, `sudo`, `xargs`, `$( … )` and git / `gh` / `glab` aliases, and they block reading stored credentials (`security find-generic-password`, `cmdkey`, `keyring`, `git credential fill`, `gh auth token`, …) or calling Redmine with an API key — the agent works with tickets only through the avflow tools. The agent may not push to `main`, `master`, `develop` or `release/*`, force push, delete remote branches, push tags, or run `reset --hard`, `clean -f`, `branch -D` or commands that discard changes, and it may not commit anything that looks like a secret (keys, tokens, passwords, `.env` files, private keys) — the message names the file and line, never the value. Through the GitLab and GitHub CLIs (`glab`, `gh`, including their `api` command) it may not **merge** or **approve** a merge request, or delete a repository, release, branch or branch protection: the agent runs them as you, so its approval would count as yours. Pushing **your own feature branch** still works. Changes to protected branches go through merge requests; if you really need a blocked command, **run it yourself** in a terminal.
 
 ## Models per task
 
@@ -256,15 +257,15 @@ Planning and review benefit from the strongest model; implementing a confirmed p
 
 | Subagent | Does | Default model | Can it change files? |
 | --- | --- | --- | --- |
-| `avflow-planner` | Design and plan for larger tickets and any ticket in a risk area | Opus | No — read-only |
+| `avflow-planner` | Design and plan for larger tickets and any ticket in a risk area | Sonnet | No — read-only |
 | `avflow-implementer` | Implements the confirmed plan, tests first | Sonnet | Yes, only the files in the plan |
 | `avflow-reviewer` | Two-stage review (spec, then code quality) when `independent-review` is required | Opus | No — reads and runs tests only |
 
 The main session — the model you pick with `/model` in Claude Code — coordinates: it hands each step to the right subagent, posts the results on the ticket and asks you to confirm. Small changes are usually done in the main session.
 
-**The models are team settings** (default Opus to plan and review, Sonnet to implement). To use other models yourself, run `avflow setup --advanced` or edit `[models]` with `avflow config --edit` and then run `avflow setup`. Allowed values: `opus`, `sonnet`, `haiku`, or `inherit` (same as the main session). `avflow check` shows each subagent with its model and reports any that differ from the configuration.
+**The models are team settings** (default Sonnet to plan and implement, Opus to review). To use other models yourself, run `avflow setup --advanced` or edit `[models]` with `avflow config --edit` and then run `avflow setup --apply`. Allowed values: `opus`, `sonnet`, `haiku`, or `inherit` (same as the main session). `avflow check` shows each subagent with its model and reports any that differ from the configuration.
 
-Opus uses your plan's limits faster than Sonnet. If you hit limits often, keep Opus for review only.
+Opus uses your plan's limits faster than Sonnet, and has its own, tighter weekly limit. The planner runs for every ticket, so it uses Sonnet; the reviewer runs only for risky changes, so it keeps Opus.
 
 ## Context monitoring
 
@@ -272,13 +273,30 @@ Answers tend to become less reliable when a session's context grows very large, 
 
 | Context size | What happens |
 | --- | --- |
-| Below the warning (default 300k tokens) | Nothing; the size is only recorded |
+| Below the warning (default 150k tokens) | Nothing; the size is only recorded |
 | Past the warning | You see a message; the agent is told to stay focused, delegate to the subagents and plan a handoff |
-| Past the limit (default 400k tokens) | You see a message; the agent is told to stop starting new work, write the handoff as a private note and ask you to start a new session |
+| Past the limit (default 250k tokens) | You see a message; the agent is told to stop starting new work, write the handoff as a private note and ask you to start a new session |
 
 The orchestrator (your main session) is checked before every prompt. Each subagent is recorded when it finishes, with its model and context size. The role subagents start with a fresh context, so delegating to them is the best way to keep the main session small.
 
-**See the history:** `avflow usage` (or `avflow usage --days 30`) lists your sessions with their peak context and model, the subagent calls per subagent and model, and how often the warning and the limit were reached. `avflow check` mentions it when the thresholds were reached recently.
+**See the history:** `avflow usage` (or `avflow usage --days 30`) lists your sessions with their peak context and model, the subagent calls per subagent and model, how often the warning and the limit were reached, and **daily totals** for this machine (sessions, turns, subagent calls, context carried — an estimate). `avflow check` mentions it when the thresholds were reached recently. Your plan's real usage is shown by **`/usage`** in Claude Code.
+
+**Session guards** keep sessions small (team settings `[guards]`, both on by default):
+
+- **One ticket per session.** Starting a second ticket in the same session is refused: *"This session is working on #12. Type /clear or open a new session to work on #15."* Reading other tickets (for example a blocker) is fine.
+- **No large files read whole.** The agent may not read a file over 200 KB in one go; it searches it with Grep and reads only the part it needs. You do nothing — the agent corrects itself.
+
+## When you hit a limit
+
+Claude has two usage limits at once — a rolling **5-hour** window and a **weekly** limit — shared by Claude Code and Claude on web, desktop and mobile. Opus also has its own, tighter weekly limit. Type **`/usage`** in Claude Code to see where you are.
+
+| Message says | What to do |
+| --- | --- |
+| Only the **Opus** limit is reached | `/model` → Sonnet, and continue. The reviewer subagent uses Opus: until the reset, ask for the review with Sonnet, or leave the independent review for later |
+| The **5-hour** limit is reached | Wait for the window to roll (the message says when); meanwhile do work without the agent — review a merge request, test, write tickets |
+| The **weekly** limit is reached | If the company enabled **extra usage**, keep working (it is billed, within a spend limit); otherwise wait for the weekly reset and tell the PM |
+
+To use less: one ticket per session (`/clear` between tickets), let the subagents do the reading, avoid pasting long logs — save them to a file and let the agent search it — and keep Opus for review.
 
 **The thresholds are team settings** (`[monitor]`). For yourself, use `avflow setup --advanced` or `avflow config --edit`. Setting `enforce = true` makes avflow refuse new prompts past the limit instead of only warning. The monitor reads the token counts Claude Code records for each reply; it never sends anything anywhere.
 
@@ -301,11 +319,11 @@ The agent picks a skill by itself when the situation matches; you can also ask f
 | `glossary` | Keeps `docs/CONTEXT.md` sharp: one term per concept, conflicts resolved, terms to avoid | A domain term is new, unclear or used with two meanings |
 | `adr` | Records a decision in `docs/adr/` when it is hard to reverse, surprising without context, and a real trade-off | An architectural or scope decision is made |
 
-**Role subagents (generated by `avflow setup`, model per role)**
+**Role subagents (generated by `avflow setup` and after each update, model per role)**
 
 | Subagent | What it does | Default model |
 | --- | --- | --- |
-| `avflow-planner` | Designs and plans larger or risky tickets; read-only | Opus |
+| `avflow-planner` | Designs and plans larger or risky tickets; read-only | Sonnet |
 | `avflow-implementer` | Implements the confirmed plan, tests first, only the files in the plan | Sonnet |
 | `avflow-reviewer` | Independent two-stage review in a fresh context; reads and runs tests only | Opus |
 
@@ -393,11 +411,11 @@ After the pilot, these numbers decide whether `gate = "fail"` becomes the defaul
 
 ### Changing the team settings
 
-The team settings live in **`team/avflow-team.toml`** in the avflow development repository: Redmine URL, statuses and field names, GitLab host, coding workflow, guardrails, protected branches, models and context thresholds.
+The team settings live in **`team/avflow-team.toml`** in the avflow development repository: Redmine URL, statuses and field names, GitLab host, coding workflow, guardrails, protected branches, models, context thresholds and session guards.
 
 1. Edit `team/avflow-team.toml`.
 2. Release: `python3 scripts/release.py --marketplace-url <marketplace git URL> --publish-to <marketplace folder> --push`. The release script checks the file and refuses to release if the Redmine URL or the GitLab host is missing.
-3. Tell the team to run `avflow update` and start a new Claude Code session.
+3. Tell the team to run `avflow update` and start a new Claude Code session. The first `avflow check` after the update applies the new settings (models, thresholds, guards) on each machine — no `avflow setup` needed.
 
 Members who overrode a setting keep their value; `avflow config` shows it as *← personal*.
 
@@ -416,12 +434,12 @@ Superpowers is kept; remove it in Claude Code with `/plugin uninstall superpower
 
 | Command | What it does |
 | --- | --- |
-| `avflow setup` | Enter your token and configure Claude Code with the team settings; safe to run again. `--advanced` asks every setting |
-| `avflow check` | Checks everything and tells you how to fix problems (the old name `doctor` still works) |
+| `avflow setup` | Enter your token and configure Claude Code with the team settings; safe to run again. `--advanced` asks every setting; `--apply` asks nothing and only applies the team settings again |
+| `avflow check` | Checks everything and tells you how to fix problems (the old name `doctor` still works); after an update, first applies the new team settings |
 | `avflow update` | Installs the latest release — with the latest team settings — and updates the plugin |
 | `avflow update --check` | Only tells you whether a new version exists |
 | `avflow config` | Shows the settings and which are yours (never the token); `--edit`, `--path`, `--reset` |
-| `avflow usage` | Context size per session and subagent calls with their models |
+| `avflow usage` | Context size per session, subagent calls with their models, daily totals for this machine |
 | `avflow init [--stack …]` | Adds the team's standard files and the risk profile to a project repository |
 | `avflow risk check` · `files` · `sync` · `suggest` | The project's risk profile: validate, try on files, regenerate CODEOWNERS and the CI copy, propose paths from gaps |
 | `avflow release-notes --from <tag>` | Release notes and acceptance checklist from the referenced tickets |

@@ -53,7 +53,7 @@ MODEL_CHOICES = ("opus", "sonnet", "haiku", "inherit")
 
 @dataclass
 class ModelsConfig:
-    plan: str = "opus"            # avflow-planner subagent
+    plan: str = "sonnet"          # avflow-planner subagent
     implement: str = "sonnet"     # avflow-implementer subagent
     review: str = "opus"          # avflow-reviewer subagent
 
@@ -61,9 +61,15 @@ class ModelsConfig:
 @dataclass
 class MonitorConfig:
     enabled: bool = True
-    warn_tokens: int = 300_000        # warn the person and the agent
-    critical_tokens: int = 400_000    # ask for a handoff and a new session
+    warn_tokens: int = 150_000        # warn the person and the agent
+    critical_tokens: int = 250_000    # ask for a handoff and a new session
     enforce: bool = False             # true: refuse new prompts past critical_tokens
+
+
+@dataclass
+class GuardsConfig:
+    one_ticket_per_session: bool = True   # start_ticket on a second ticket in the same session is blocked (/clear first)
+    max_read_kb: int = 200                # reading a larger file whole is blocked (offset/limit or Grep); 0 = off
 
 
 @dataclass
@@ -74,9 +80,10 @@ class Config:
     workflow: WorkflowConfig = field(default_factory=WorkflowConfig)
     models: ModelsConfig = field(default_factory=ModelsConfig)
     monitor: MonitorConfig = field(default_factory=MonitorConfig)
+    guards: GuardsConfig = field(default_factory=GuardsConfig)
 
     # ---------- dict form
-    SECTIONS = ("tickets", "repo", "workflow", "models", "monitor")
+    SECTIONS = ("tickets", "repo", "workflow", "models", "monitor", "guards")
 
     def to_dict(self) -> dict:
         d = {"marketplace": self.marketplace}
@@ -89,7 +96,8 @@ class Config:
         def build(cls, sec):
             return cls(**{k: v for k, v in (data.get(sec) or {}).items() if k in cls.__dataclass_fields__})
         return Config(build(TicketConfig, "tickets"), build(RepoConfig, "repo"), data.get("marketplace", "") or "",
-                      build(WorkflowConfig, "workflow"), build(ModelsConfig, "models"), build(MonitorConfig, "monitor"))
+                      build(WorkflowConfig, "workflow"), build(ModelsConfig, "models"), build(MonitorConfig, "monitor"),
+                      build(GuardsConfig, "guards"))
 
     # ---------- file: team defaults (shipped with the release) + personal overrides (~/.avflow/config.toml)
     @staticmethod

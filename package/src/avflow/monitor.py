@@ -96,12 +96,14 @@ def handle(payload: dict, cfg, home: Path, now: datetime | None = None) -> tuple
 
 
 def summary(home: Path, days: int = 7, now: datetime | None = None) -> dict:
-    """Aggregate the usage log: peak context per session, subagent calls per type and model, threshold hits."""
+    """Aggregate the usage log: peak context per session, subagent calls per type and model, threshold hits, and
+    daily totals (sessions, turns, subagent calls, context carried at the end of each turn or subagent call — an
+    estimate of the input processed, not the plan's usage: /usage in Claude Code shows that)."""
     now = now or datetime.now(timezone.utc)
-    sessions, agents, hits = {}, {}, {"warn": 0, "critical": 0}
+    sessions, agents, hits, per_day = {}, {}, {"warn": 0, "critical": 0}, {}
     p = home / "usage.log"
     if not p.exists():
-        return {"sessions": {}, "agents": {}, "hits": hits}
+        return {"sessions": {}, "agents": {}, "hits": hits, "days": {}}
     for line in p.read_text(encoding="utf-8").splitlines():
         try:
             e = json.loads(line)
@@ -111,6 +113,15 @@ def summary(home: Path, days: int = 7, now: datetime | None = None) -> dict:
         if (now - t).days >= days:
             continue
         tok = e.get("context_tokens") or 0
+        d = per_day.setdefault(t.astimezone().date().isoformat(), {"sessions": set(), "turns": 0, "subagents": 0, "context": 0})
+        if e.get("agent") == "main" and e.get("event") == "Stop":
+            d["turns"] += 1
+            d["context"] += tok
+        elif e.get("event") == "SubagentStop":
+            d["subagents"] += 1
+            d["context"] += tok
+        if e.get("session"):
+            d["sessions"].add(e["session"])
         if e.get("agent") == "main":
             s = sessions.setdefault(e.get("session") or "?", {"peak": 0, "model": None, "last": e["time"]})
             if tok >= s["peak"]:
@@ -123,7 +134,8 @@ def summary(home: Path, days: int = 7, now: datetime | None = None) -> dict:
             a = agents.setdefault(key, {"calls": 0, "peak": 0})
             a["calls"] += 1
             a["peak"] = max(a["peak"], tok)
-    return {"sessions": sessions, "agents": agents, "hits": hits}
+    per_day = {k: {**v, "sessions": len(v["sessions"])} for k, v in sorted(per_day.items())}
+    return {"sessions": sessions, "agents": agents, "hits": hits, "days": per_day}
 
 
 def main() -> int:

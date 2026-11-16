@@ -5,6 +5,75 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
+## 3.0.2: usage limits, update without setup, security re-check (Nov 16, 2026)
+
+**Why:** running out of Claude usage mid-week is one of the PM's biggest worries — one occurrence stops the whole team
+and is the kind of failure that makes sceptical members quit. Facts checked against Anthropic's help centre (figures
+change; `/usage` in Claude Code is the source of truth):
+- Two limits at once: a rolling 5-hour window and a weekly limit.
+- One pool shared by Claude Code and Claude on web, desktop and mobile.
+- Opus has its own, tighter weekly limit; when only the Opus limit is reached, switching to Sonnet keeps working. The
+  5-hour and weekly limits are shared by all models — switching does not help.
+- Team/Enterprise owners can enable **extra usage** (billed at API prices) with spend limits, so members keep working
+  after their included usage.
+
+**Decided and done**
+
+1. **Updating applies the team settings without questions.** `avflow update` runs the *installed* (old) version's
+   code, which installs the new release and then runs `avflow check` with the new one — so a step added to 3.0.2's
+   `update` would never run on the update from 3.0.1. Instead, **`avflow check` applies** the settings that need no
+   question (permissions, role subagents from `[models]`, hooks) once per installed version, recorded in
+   `~/.avflow/applied_version`, then says "open a new Claude Code session". Tokens are never touched. `avflow setup
+   --apply` does the same on demand; `avflow setup` uses the same step. The PM accepted check changing files on the
+   first run after an update.
+2. **Team model defaults:** `plan = "sonnet"`, `implement = "sonnet"`, `review = "opus"`. The planner runs for every
+   ticket, so it must be cheap; the reviewer runs only for `independent-review`, so Opus stays affordable there.
+   Personal overrides are kept (they live in the personal file).
+3. **Context thresholds:** warn 150k, limit 250k (team settings). Each reply re-reads the whole context.
+4. **Session guards** — a new hook `avflow-session-guard`, team settings `[guards]`, both on by default:
+   - **One ticket per session:** PreToolUse on `mcp__avflow-tickets__start_ticket` blocks a different ticket in the same
+     `session_id` ("This session is working on #<a>. Type /clear or open a new session to work on #<b>."). The ticket is
+     recorded on **PostToolUse, only after a successful start**, so a refused start (not Ready, blocked) does not bind
+     the session. Same ticket again and reading other tickets stay allowed. State in `~/.avflow/sessions.json`,
+     entries older than 7 days dropped.
+   - **No whole large files:** PreToolUse on Read blocks a file over `max_read_kb = 200` read without offset/limit; the
+     message sends the agent to Grep and ranges. Images, PDFs and notebooks are exempt (the Read tool handles them).
+     Only the agent's tool calls pass through the hook; the person is never blocked.
+5. **Visibility:** `avflow usage` adds daily totals for this machine (sessions, turns, subagent calls, context carried —
+   an estimate, avflow cannot read the plan's usage). `avflow check` **always** prints a one-line reminder to type
+   `/usage` (PM's choice over a threshold: avflow's numbers are an estimate). The `tickets` skill ends each ticket with
+   "/clear before the next ticket".
+6. **User guide section "When you hit a limit".**
+
+**Security (from the avflow stress test, both confirmed open on 3.0.1 and fixed)**
+
+7. **Credential reads:** the agent could read the token from the OS keyring (`security find-generic-password`,
+   `dump-keychain`, `cmdkey`, `python -c … keyring …`) and call Redmine with `curl`, bypassing every ticket rule. Setup
+   now writes Claude Code **deny** rules for these commands (`setup_steps.DENY_RULES`, also `git credential fill`,
+   `gh auth token`, `glab config get token`), and the guardrails hook blocks them, keyring access in inline code
+   (`keyring`, `get_secret`, `keytar`, PasswordVault, …), and any command carrying `X-Redmine-API-Key`.
+8. **Nested commands:** the guardrails hook now walks every command it can see: `bash`/`sh`/`zsh -c`, `cmd /c`,
+   `pwsh`/`powershell -Command` and `-EncodedCommand`, `eval`, wrappers (`env`, `sudo`, `command`, `exec`, `nohup`,
+   `time`, `nice`, `timeout`, `xargs`), `$( … )`, backticks, subshells and groups, `echo … | sh`, string literals in
+   `python -c` / `node -e` / `ruby -e` / `perl -e` / `osascript -e`; git aliases (`-c alias.x=…` and `git config`,
+   including `!` shell aliases) and `gh` / `glab` aliases. Heredoc bodies (commit messages) are text, not commands.
+   Depth is capped; anything unreadable is allowed.
+
+**Limits, stated in the docs:** the hooks guard against mistakes and injected instructions; they are not a security
+boundary. A script written to a file and then run (`python leak.py`) is not inspected. The real protections stay: no
+token in files or output, ticket rules in the MCP server, the CI gate and GitLab's own settings.
+
+**Company decision (not avflow):** enable extra usage for the organisation with a monthly spend limit, so the team is
+never fully stopped; give the heaviest users a higher seat tier if needed.
+
+**Acceptance:** after `avflow update` from 3.0.1, with no other command: subagents show sonnet / sonnet / opus in
+`avflow check`; starting a second ticket in one session is blocked with the /clear message; reading a large file without
+a range is blocked and the agent retries in parts; `bash -c "git push origin main"` and a keyring read are blocked.
+Covered by tests (`test_apply.py`, `test_session_guard.py`, `test_nested_guard.py`); the real update and the hooks in a
+live Claude Code session are in the test plan (U1–U6).
+
+---
+
 ## Git guardrails cover the forge CLIs: no merge, approve or delete through gh / glab (Nov 14, 2026)
 
 - The guardrails hook now also reads `gh` and `glab` commands (and their `api` calls) and blocks merging a merge

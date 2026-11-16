@@ -1,6 +1,6 @@
 [project]
 name = "avflow"
-version = "3.0.1"
+version = "3.0.2"
 description = "One-command setup of the team's AI coding workflow: ticket system, repository/CI, Claude Code, Superpowers and team skills."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,7 @@ avflow = "avflow.cli:main"
 avflow-ticket-mcp = "avflow.tickets.server:main"
 avflow-git-guard = "avflow.git_guard:main"
 avflow-monitor = "avflow.monitor:main"
+avflow-session-guard = "avflow.session_guard:main"
 
 [build-system]
 requires = ["hatchling"]

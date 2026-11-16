@@ -18,7 +18,7 @@ The repository owner is the PM (Alvin). Members install releases; they never see
 
 | Path | What |
 |---|---|
-| `package/src/avflow/` | The Python package: CLI (`cli.py`), setup steps (`setup_steps.py`), configuration (`config.py`), risk profile and required checks (`risk.py`), MCP server (`tickets/`), git guardrails hook (`git_guard.py`), context monitor hook (`monitor.py`), `init_repo.py`, `release_notes.py`, `report.py`, `integrity.py` |
+| `package/src/avflow/` | The Python package: CLI (`cli.py`), setup steps (`setup_steps.py`), configuration (`config.py`), risk profile and required checks (`risk.py`), MCP server (`tickets/`), git guardrails hook (`git_guard.py`), context monitor hook (`monitor.py`), session guards hook (`session_guard.py`), `init_repo.py`, `release_notes.py`, `report.py`, `integrity.py` |
 | `package/src/avflow/tickets/` | MCP server `avflow-tickets`: `core.py` (the rules), `adapters/redmine.py` (Redmine REST), `repo.py` (git / glab: profile, changed files, MR notes), `server.py`, `audit.py` |
 | `package/src/avflow/agents/` | Role subagent templates (`{model}` placeholder), generated into `~/.claude/agents/` by setup |
 | `package/src/avflow/templates/` | Files written into project repos by `avflow init` |
@@ -61,7 +61,7 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 - **Cross-platform:** macOS and Windows are both first-class. Resolve external programs through `setup_steps.run`
   (uses `shutil.which`, needed for `claude.cmd`), keep output UTF-8 safe, keep `bootstrap.ps1` and `reset-avflow.ps1` in
   step with their `.sh` twins. Reset scripts must keep removing old names (kickoff-kit, htkm-kit, redmine-agent).
-- **Hooks** (`avflow-git-guard`, `avflow-monitor`) must never crash Claude Code: on any unexpected input, allow and exit 0.
+- **Hooks** (`avflow-git-guard`, `avflow-monitor`, `avflow-session-guard`) must never crash Claude Code: on any unexpected input, allow and exit 0.
   Only exit 2 for a deliberate block, with a clear message.
 - **Skills are generic team skills.** No project-specific words (machine, panel, test bench, a project's or customer's name) in avflow skills —
   those belong to the project's own repository: its `.avflow/project.toml`, the *Test environments and languages*
@@ -85,7 +85,10 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 
 ## Current state (Nov 2026)
 
-- Version **3.0.1** in the repository (3.0.0 released Nov 13, 2026; 3.0.1 adds the gh / glab guardrails). Releases to the marketplace may lag; check `git tag` and GitHub Releases.
+- Version **3.0.2** in the repository (3.0.0 released Nov 13, 2026; 3.0.1 adds the gh / glab guardrails; 3.0.2 — usage
+  limits and security re-check, on branch `avflow-3.0.2`: `avflow check` applies the team settings once per installed
+  version (`apply_if_new`), Sonnet planner, 150k / 250k thresholds, session guards, credential deny rules, nested-command
+  guard). Releases to the marketplace may lag; check `git tag` and GitHub Releases.
 - **avflow 3.0** — one flow and project-defined risk (`docs/design/avflow-3.0.md`). Decisions answered (see
   `docs/decisions.md`; Enclave's GitLab is Free). **Phases 1–3 done** on branch `avflow-3.0-phase1`: profile and
   validation (`risk.py`, standard library only — CI uses a copy), the ticket's risk area,
