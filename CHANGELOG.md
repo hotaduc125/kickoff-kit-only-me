@@ -3,6 +3,45 @@
 What changed in each avflow release, newest first. Why things changed is in `docs/decisions.md`; releases before
 3.0.0 are described there by version.
 
+## 3.0.2 — unreleased
+
+Upgrading from 3.0.x: `avflow update`, then open a new Claude Code session — no setup needed. The first `avflow check`
+after the update applies the new team settings on its own.
+
+### Changed
+
+- **Update applies the team settings without questions:** the first `avflow check` after an update regenerates the
+  role subagents and re-registers permissions and hooks for the new version, without touching the token, then says
+  to open a new Claude Code session. `avflow setup --apply` does the same on demand. No more *"edited by hand"* after a
+  release that changes the subagents.
+- **Cheaper models by default:** the planner now uses **Sonnet** (it runs for every ticket); the implementer stays on
+  Sonnet and the reviewer on Opus. Personal overrides are kept.
+- **Smaller context thresholds:** warn at 150k tokens, limit at 250k (were 300k / 400k).
+
+### Added
+
+- **One ticket per session:** starting a second ticket in the same Claude Code session is refused — *"This session is
+  working on #12. Type /clear or open a new session to work on #15."* Reading other tickets still works; a refused start
+  does not count. The `tickets` skill ends each ticket with "/clear before the next ticket".
+- **No large files read whole:** the agent may not read a file over 200 KB without a range; it searches with Grep and
+  reads only the part it needs. Images, PDFs and notebooks are exempt.
+- Both rules are team settings (`[guards]`, on by default) in a new hook, `avflow-session-guard`.
+- **`avflow usage` daily totals** for this machine (sessions, turns, subagent calls, context carried — an estimate).
+  `avflow check` reminds you that `/usage` in Claude Code shows the plan's 5-hour and weekly limits.
+- **User guide: "When you hit a limit"** — what to do for the Opus, 5-hour and weekly limits.
+
+### Security
+
+- **Stored tokens cannot be read by the agent:** setup now denies commands that read the OS keyring or CLI tokens
+  (`security find-generic-password`, `dump-keychain`, `cmdkey`, `secret-tool`, `keyring get`, `git credential fill`,
+  `gh auth token`, `glab config get token`, …) in Claude Code's permissions, and the guardrails hook blocks them too —
+  including keyring access in inline code and any command that sends `X-Redmine-API-Key`.
+- **Guardrails see nested commands:** `bash -c`, `sh -c`, `cmd /c`, `pwsh -Command` (also encoded), `python -c`,
+  `node -e`, `eval`, `env`, `sudo`, `xargs`, `$( … )`, backticks, subshells, `echo … | sh`, and git / `gh` / `glab`
+  aliases (`git p` = `push --force`) are evaluated like the plain command.
+- The hooks guard against mistakes and injected instructions; they are not a security boundary (a script written to a
+  file and then run is not inspected).
+
 ## 3.0.1 — Nov 15, 2026
 
 Upgrading from 3.0.0: `avflow update` — no setup needed. From 2.6.x: follow the 3.0.0 steps below.

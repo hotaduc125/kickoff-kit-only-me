@@ -24,26 +24,27 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 
 | # | Check | Command / action | Expected |
 |---|---|---|---|
-| 1.1 | Get the files | `gh release download v3.0.1 --repo alvin-enc/avflow-marketplace` | the wheel, `bootstrap.ps1`, `bootstrap.sh` and `INSTALL.md` in one folder |
-| 1.2 | Run bootstrap | `powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 .\avflow-3.0.1-py3-none-any.whl` | uv installed if missing, then `avflow 3.0.1 — setup` |
+| 1.1 | Get the files | `gh release download v3.0.2 --repo alvin-enc/avflow-marketplace` | the wheel, `bootstrap.ps1`, `bootstrap.sh` and `INSTALL.md` in one folder |
+| 1.2 | Run bootstrap | `powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 .\avflow-3.0.2-py3-none-any.whl` | uv installed if missing, then `avflow 3.0.2 — setup` |
 | 1.3 | Team settings | — | setup prints the **Team settings** (Redmine URL, GitLab host, statuses, workflow, models, monitor) and does **not** ask for the URL, the workflow, the models or the guardrails |
 | 1.4 | Redmine API key | paste your **own** key (input hidden) | `✅ Connected as <your name>` |
 | 1.5 | Token storage | Control Panel → Credential Manager → Windows Credentials | an entry containing `avflow` |
 | 1.6 | GitLab | — | `✅ GitLab login (gitlab.enclave.vn)`, or a hint how to sign in with `glab auth login` (then run `avflow setup` again) |
-| 1.7 | Claude Code steps | — | ✅ MCP registered, permissions, Superpowers, avflow plugin, handoff, three role subagents, git guardrails hook, context monitor hook |
-| 1.8 | Final check | printed at the end | all ✅ (➖ lines are fine), including `Workflow:`, `Git guardrails hook`, `Context monitor`, the three subagents with models opus / sonnet / opus and `Plugin integrity: v3.0.1` |
+| 1.7 | Claude Code steps | — | ✅ MCP registered, permissions (with *credential reads denied*), Superpowers, avflow plugin, handoff, three role subagents, context monitor hook, git guardrails hook, session guards |
+| 1.8 | Final check | printed at the end | all ✅ (➖ lines are fine), including `Workflow:`, `Git guardrails hook`, `Context monitor (warn 150k, limit 250k)`, `Session guards`, the three subagents with models sonnet / sonnet / opus and `Plugin integrity: v3.0.2`; a ➖ line about `/usage` |
 
 ## 2. After install
 
 | # | Check | Command | Expected |
 |---|---|---|---|
-| 2.1 | Commands on PATH (new window) | `avflow --version` | `3.0.1` |
+| 2.1 | Commands on PATH (new window) | `avflow --version` | `3.0.2` |
 | 2.2 | Check again | `avflow check` | all ✅, symbols display correctly (no `?` or crash) |
-| 2.3 | Configuration | `avflow config` | `[tickets]`, `[repo]`, `[workflow]`, `[models]`, `[monitor]`; *"Token stored in the OS keyring … : yes"*; **no** token value |
+| 2.3 | Configuration | `avflow config` | `[tickets]`, `[repo]`, `[workflow]`, `[models]`, `[monitor]`, `[guards]`; *"Token stored in the OS keyring … : yes"*; **no** token value |
 | 2.4 | MCP list | `claude mcp list` | `avflow-tickets` connected |
 | 2.5 | Plugin list | `claude plugin list` | avflow and superpowers |
 | 2.6 | Role subagents | `dir $env:USERPROFILE\.claude\agents` | `avflow-planner.md`, `avflow-implementer.md`, `avflow-reviewer.md` |
-| 2.7 | Context monitor | after a short Claude Code session: `avflow usage` | the session listed with its peak context and model; subagent calls listed if any ran |
+| 2.7 | Context monitor | after a short Claude Code session: `avflow usage` | the session listed with its peak context and model; subagent calls listed if any ran; a *Per day on this machine* line for today |
+| 2.9 | Session guard command | `Get-Command avflow-session-guard` | found under `%USERPROFILE%\.local\bin`; `settings.json` hooks call it with the full `.exe` path |
 | 2.8 | Files | `dir $env:USERPROFILE\.claude\skills\handoff` and `dir $env:USERPROFILE\.avflow` | both exist; no token in `config.toml` |
 
 ## 3. In Claude Code (CLI, new session)
@@ -66,6 +67,10 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 | 3b.3 | Feature branch | on a test feature branch: `git push -u origin <branch>` | allowed |
 | 3b.4 | Secret in a commit | add a file containing `token: ghp_` + 36 letters, stage it, ask Claude to commit | blocked; message names the file and line, never the value |
 | 3b.5 | Merge / approve through the CLI | on a test MR: `glab mr merge <iid>`, then `glab mr approve <iid>` | both blocked; `glab mr view <iid>` allowed |
+| 3b.6 | Nested commands | `cmd /c "git push origin develop"`, `powershell -Command "git push origin develop"`, `bash -c "git push --force"` | all blocked with the same reason as the plain command |
+| 3b.7 | Credentials | `cmdkey /list`, `powershell -Command "Get-StoredCredential -Target avflow"`, `git credential fill` | refused (Claude Code *deny* or the hook); no token shown |
+| 3b.8 | One ticket per session | start a test ticket, then ask to start another one | the second is blocked with *"This session is working on #… Type /clear …"*; after `/clear` it starts |
+| 3b.9 | Large file | create a file over 200 KB (`1..60000 \| % { "line $_" } > big.log`), ask Claude to read it | the whole-file read is blocked; Claude searches or reads parts instead |
 
 ## 3c. Personal settings (advanced setup)
 
@@ -73,7 +78,7 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 |---|---|---|---|
 | 3c.1 | Switch workflow | `avflow setup --advanced`, choose **2 (Matt Pocock's skills)** | *"Superpowers removed"*, the Pocock skills installed under `…\.claude\skills` |
 | 3c.2 | Check | `avflow check`; `avflow config` | `Workflow: Matt Pocock's skills`, no "both installed" error; `profile` marked *← personal* |
-| 3c.3 | Back to the team settings | `avflow config --reset`, then `avflow setup` | *"Removed Matt Pocock workflow skills: …"*, Superpowers back; no *← personal* line |
+| 3c.3 | Back to the team settings | `avflow config --reset`, then `avflow setup --apply` (asks nothing) | *"Removed Matt Pocock workflow skills: …"*, Superpowers back; no *← personal* line |
 
 ## 4. Claude Desktop — Code tab (optional)
 
@@ -94,7 +99,7 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 
 | # | Check | Action | Expected |
 |---|---|---|---|
-| 6.1 | Edit a skill | add a line to `…\.claude\plugins\cache\avflow\avflow\3.0.1\skills\tickets\SKILL.md` | `avflow check` → ❌ modified: skills/tickets/SKILL.md |
+| 6.1 | Edit a skill | add a line to `…\.claude\plugins\cache\avflow\avflow\3.0.2\skills\tickets\SKILL.md` | `avflow check` → ❌ modified: skills/tickets/SKILL.md |
 | 6.2 | Restore | `/plugin uninstall avflow@avflow`, then `/plugin install avflow@avflow` | check → ✅ |
 | 6.3 | Edit a subagent | add a line to `$env:USERPROFILE\.claude\agents\avflow-reviewer.md` | `avflow check` → ❌ *edited by hand — run avflow setup*; after `avflow setup` → ✅ |
 
@@ -105,6 +110,7 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 | 7.1 | Reset | `powershell -ExecutionPolicy Bypass -File .\reset-avflow.ps1` | `✅ Clean — ready for a first install.` |
 | 7.2 | Credential Manager | open it again | no `avflow` entry |
 | 7.3 | Agents | `dir $env:USERPROFILE\.claude\agents` | no `avflow-*.md` |
+| 7.3b | Settings | open `%USERPROFILE%\.claude\settings.json` | no `avflow-` hooks, no avflow `deny` rules; your own entries kept |
 | 7.4 | Reinstall | repeat section 1 | works as the first time |
 
 ## 8. Project commands (3.0)
@@ -123,13 +129,13 @@ In a clone of `avflow-sandbox` on a new feature branch (`git switch -c windows-t
 | 8.8 | Report | `avflow report --days 7` | prints without an encoding error; a `## Risk` section if any ticket was reviewed in the period |
 | 8.9 | Clean up | `git switch develop`; `git branch -D windows-test` | — |
 
-## 9. Update from 2.x (only on a PC that still has 2.6.x)
+## 9. Update from an older version (on a PC that still has 3.0.1 or 2.6.x)
 
 | # | Check | Command | Expected |
 |---|---|---|---|
-| 9.1 | Update | `avflow update` | installs 3.0.1, plugin updated |
-| 9.2 | Check | `avflow check` | the three subagents ❌ *edited by hand — run avflow setup* (3.0 changed them) |
-| 9.3 | Setup once | `avflow setup` | asks nothing new; `check` all ✅ |
+| 9.1 | Update | `avflow update` | installs 3.0.2, plugin updated |
+| 9.2 | Check | printed by `update` | *"avflow 3.0.2 is new on this machine — applying the team settings"*, then the three subagents ✅ sonnet / sonnet / opus — no `avflow setup` needed |
+| 9.3 | Check again | `avflow check` | does not apply again; all ✅ |
 | 9.4 | New session | `/avflow:next-ticket` | no Mode question; `choose-mode` no longer listed |
 
 ## Known Windows points to watch

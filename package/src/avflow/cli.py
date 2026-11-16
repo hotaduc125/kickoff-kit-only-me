@@ -166,6 +166,8 @@ def setup_redmine_token(t: TicketConfig) -> TicketConfig:
 
 
 def cmd_setup(args) -> int:
+    if getattr(args, "apply", False):
+        return cmd_apply(args)
     print(f"avflow {__version__} — setup\n")
     try:
         cfg = Config.load()
@@ -242,7 +244,7 @@ def cmd_setup(args) -> int:
                     if v.isdigit() and int(v) > 0:
                         setattr(cfg.monitor, attr, int(v) * 1000)
                         break
-                    print("  Enter a whole number, for example 300.")
+                    print("  Enter a whole number, for example 150.")
             if cfg.monitor.critical_tokens <= cfg.monitor.warn_tokens:
                 cfg.monitor.critical_tokens = cfg.monitor.warn_tokens + 100_000
                 print(f"  Limit raised to {cfg.monitor.critical_tokens // 1000}k (it must be above the warning).")
@@ -252,8 +254,6 @@ def cmd_setup(args) -> int:
     print("\nClaude Code")
     r, out = st.register_mcp()
     (ok if r else bad)("MCP server avflow-tickets registered" if r else f"MCP registration failed: {out.strip()[:200]}")
-    st.merge_permissions()
-    ok("Permissions: read tools allowed, write tools ask first")
     if not st.can_read_repo(cfg.marketplace):
         bad(f"Cannot read the avflow marketplace: {cfg.marketplace}")
         print("     Ask the PM for read access, then sign in to the git host (GitHub: `gh auth login` and `gh auth setup-git`), and run setup again.")
@@ -278,22 +278,68 @@ def cmd_setup(args) -> int:
         ok("Matt Pocock skills: " + ", ".join(done))
     if miss:
         bad("Matt Pocock skills not found: " + ", ".join(miss))
-    ok("Role subagents: " + ", ".join(st.install_agents(cfg.models)))
-    try:
-        st.set_monitor(cfg.monitor.enabled)
-        ok("Context monitor " + (f"enabled (warn {cfg.monitor.warn_tokens // 1000}k, limit {cfg.monitor.critical_tokens // 1000}k)"
-                                 if cfg.monitor.enabled else "disabled"))
-    except SystemExit as e:
-        bad(f"Context monitor: {e}")
-    try:
-        st.set_git_guard(cfg.workflow.git_guardrails)
-        ok("Git guardrails " + ("enabled" if cfg.workflow.git_guardrails else "disabled"))
-    except SystemExit as e:
-        bad(f"Git guardrails: {e}")
+    apply_settings(cfg)
     cfg.save()
 
     print()
     return cmd_doctor(args)
+
+
+def _guards_label(g) -> str:
+    rules = (["one ticket per session"] if g.one_ticket_per_session else []) + \
+            ([f"no whole-file reads over {g.max_read_kb} KB"] if g.max_read_kb else [])
+    return ", ".join(rules)
+
+
+def apply_settings(cfg) -> int:
+    """The team settings that need no question: permissions, role subagents, hooks. Tokens are never touched.
+
+    Run by setup, by `avflow setup --apply`, and by `avflow check` after an update (apply_if_new). Returns the number
+    of steps that failed; every step runs even if an earlier one failed."""
+    g = cfg.guards
+    steps = [
+        ("Permissions: read tools allowed, write tools ask first, credential reads denied", st.merge_permissions),
+        (None, lambda: ok("Role subagents: " + ", ".join(st.install_agents(cfg.models)))),
+        ("Context monitor " + (f"enabled (warn {cfg.monitor.warn_tokens // 1000}k, limit {cfg.monitor.critical_tokens // 1000}k)"
+                               if cfg.monitor.enabled else "disabled"), lambda: st.set_monitor(cfg.monitor.enabled)),
+        ("Git guardrails " + ("enabled" if cfg.workflow.git_guardrails else "disabled"),
+         lambda: st.set_git_guard(cfg.workflow.git_guardrails)),
+        ("Session guards " + (f"enabled ({_guards_label(g)})" if _guards_label(g) else "disabled"),
+         lambda: st.set_session_guard(bool(_guards_label(g)))),
+    ]
+    failed = 0
+    for label, step in steps:
+        try:
+            step()
+            if label:
+                ok(label)
+        except (SystemExit, OSError) as e:
+            bad(f"{(label or 'Role subagents').split(' (')[0]}: {e}")
+            failed += 1
+    st.record_applied(HOME, __version__)
+    return failed
+
+
+def apply_if_new(cfg) -> bool:
+    """After an update: apply the team settings once for the installed version (no questions)."""
+    if st.applied_version(HOME) == __version__:
+        return False
+    print(f"  ➖ avflow {__version__} is new on this machine — applying the team settings (no questions, tokens untouched)")
+    apply_settings(cfg)
+    print("  ➖ Open a new Claude Code session so it uses the new subagents and hooks.")
+    return True
+
+
+def cmd_apply(args) -> int:
+    try:
+        cfg = Config.load()
+    except SystemExit as e:
+        bad(str(e))
+        return 1
+    print(f"avflow {__version__} — applying the team settings (no questions, tokens untouched)\n")
+    failed = apply_settings(cfg)
+    print("\nOpen a new Claude Code session so it uses the new subagents and hooks.\n")
+    return cmd_doctor(args) or (1 if failed else 0)
 
 
 def cmd_doctor(_args) -> int:
@@ -308,6 +354,7 @@ def cmd_doctor(_args) -> int:
     except SystemExit as e:
         bad(str(e))
         return 1
+    apply_if_new(cfg)
     try:
         t = cfg.tickets
         me = make_adapter(t, get_secret(t.provider, t.url)).whoami()
@@ -358,6 +405,11 @@ def cmd_doctor(_args) -> int:
         h = summary(HOME, 7)["hits"]
         if h["warn"] or h["critical"]:
             print(f"  ➖ Last 7 days: {h['warn']} prompt(s) past the warning, {h['critical']} past the limit — see `avflow usage`")
+    if _guards_label(cfg.guards):
+        good = st.session_guard_installed()
+        (ok if good else bad)(f"Session guards ({_guards_label(cfg.guards)})")
+        failed += 0 if good else 1
+    print("  ➖ Usage limits: type /usage in Claude Code to see what is left of the 5-hour and weekly limits")
     for name, good, detail in st.agents_status(cfg.models):
         (ok if good else bad)(f"Subagent {name}: {detail}")
         failed += 0 if good else 1
@@ -730,6 +782,13 @@ def cmd_usage(args) -> int:
     if not s["agents"]:
         print("  (no data yet)")
     print(f"\nPrompts past the warning: {s['hits']['warn']} · past the limit: {s['hits']['critical']}")
+    print("\nPer day on this machine (context = sum at the end of each turn and subagent call; an estimate):")
+    for day, v in s.get("days", {}).items():
+        print(f"  {day}  {v['sessions']:>3} session(s)  {v['turns']:>4} turn(s)  {v['subagents']:>3} subagent call(s)  "
+              f"context {v['context'] / 1e6:.1f}M")
+    if not s.get("days"):
+        print("  (no data yet)")
+    print("\nYour plan's 5-hour and weekly limits: type /usage in Claude Code.")
     return 0
 
 
@@ -767,6 +826,10 @@ def cmd_uninstall(_args) -> int:
     try:
         st.set_git_guard(False)
         ok("Git guardrails hook removed")
+        st.set_session_guard(False)
+        ok("Session guards removed")
+        st.remove_deny_rules()
+        ok("Credential deny rules removed")
     except SystemExit:
         pass
     ok("avflow plugin removed (Superpowers and other plugins are kept)")
@@ -793,6 +856,8 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     sp = sub.add_parser("setup", help="enter your tokens and configure Claude Code with the team settings")
     sp.add_argument("--advanced", action="store_true", help="also ask every team setting (saved as your personal overrides)")
+    sp.add_argument("--apply", action="store_true",
+                    help="no questions: apply the team settings again (permissions, role subagents, hooks); tokens untouched")
     sp.set_defaults(fn=cmd_setup)
     sub.add_parser("check", aliases=["doctor"], help="check that everything works (alias: doctor)").set_defaults(fn=cmd_doctor)
     it = sub.add_parser("init", help="add the team's standard files to a project repository")

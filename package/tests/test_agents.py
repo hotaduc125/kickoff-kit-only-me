@@ -37,7 +37,7 @@ def test_status_ok_then_detects_changes(tmp_path):
     assert all(good for _, good, _ in st.agents_status(m, tmp_path))
     changed = ModelsConfig(review="sonnet")
     bad = [d for n, good, d in st.agents_status(changed, tmp_path) if not good]
-    assert bad == ["model is opus, configuration says sonnet — run avflow setup"]
+    assert bad == ["model is opus, configuration says sonnet — run avflow setup --apply"]
     f = tmp_path / "avflow-planner.md"
     f.write_text(f.read_text() + "\nextra line\n")
     assert any("edited by hand" in d for _, _, d in st.agents_status(m, tmp_path))

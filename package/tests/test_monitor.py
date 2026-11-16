@@ -41,7 +41,7 @@ def test_prompt_ok_is_silent_and_logged(tmp_path):
 
 
 def test_prompt_warn_and_critical_inform_user_and_agent(tmp_path):
-    for usage, word in (((0, 320000, 0), "warning"), ((0, 450000, 0), "limit")):
+    for usage, word in (((0, 180000, 0), "warning"), ((0, 280000, 0), "limit")):
         t = transcript(tmp_path / f"{word}.jsonl", usage)
         code, out = monitor.handle({"hook_event_name": "UserPromptSubmit", "session_id": "s", "transcript_path": t},
                                    MonitorConfig(), tmp_path, NOW)
@@ -113,3 +113,18 @@ def test_monitor_config_roundtrip(tmp_path):
     Config(monitor=MonitorConfig(enabled=True, warn_tokens=250000, critical_tokens=380000, enforce=True)).save(p)
     m = Config.load(p).monitor
     assert (m.enabled, m.warn_tokens, m.critical_tokens, m.enforce) == (True, 250000, 380000, True)
+
+
+def test_summary_daily_totals(tmp_path):
+    """Per day on this machine: sessions, turns, subagent calls and the context they carried (an estimate)."""
+    rows = [
+        {"time": "2026-11-09T10:00:00+00:00", "event": "UserPromptSubmit", "session": "s1", "agent": "main", "context_tokens": 90000},
+        {"time": "2026-11-09T10:05:00+00:00", "event": "Stop", "session": "s1", "agent": "main", "context_tokens": 100000},
+        {"time": "2026-11-09T11:00:00+00:00", "event": "Stop", "session": "s2", "agent": "main", "context_tokens": 50000},
+        {"time": "2026-11-09T11:30:00+00:00", "event": "SubagentStop", "session": "s2", "agent": "avflow-reviewer", "context_tokens": 40000},
+        {"time": "2026-11-10T10:00:00+00:00", "event": "Stop", "session": "s3", "agent": "main", "context_tokens": 20000},
+    ]
+    (tmp_path / "usage.log").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    days = monitor.summary(tmp_path, 7, NOW)["days"]
+    assert days["2026-11-09"] == {"sessions": 2, "turns": 2, "subagents": 1, "context": 190000}
+    assert days["2026-11-10"] == {"sessions": 1, "turns": 1, "subagents": 0, "context": 20000}

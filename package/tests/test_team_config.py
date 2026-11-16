@@ -161,3 +161,26 @@ def test_a_2_6_personal_file_still_loads(tmp_path):
     f.write_text('[tickets]\nfield_mode = "Chế độ"\nfield_machine_side = "Machine side"\nsomething_new = 1\n', encoding="utf-8")
     c = Config.load(f, team={"tickets": {"url": "https://r.test"}})
     assert c.tickets.field_risk_area == "Risk area" and not hasattr(c.tickets, "field_machine_side")
+
+
+def test_shipped_team_settings_keep_usage_low():
+    """3.0.2: Sonnet plans and implements, Opus reviews; smaller context thresholds; both session guards on."""
+    import sys
+    from pathlib import Path
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:  # pragma: no cover
+        import tomli as tomllib
+    team_file = tomllib.loads((Path(__file__).parents[2] / "team" / "avflow-team.toml").read_text(encoding="utf-8"))
+    for d in (team_defaults(), team_file):
+        c = Config.team(d)
+        assert (c.models.plan, c.models.implement, c.models.review) == ("sonnet", "sonnet", "opus")
+        assert (c.monitor.warn_tokens, c.monitor.critical_tokens) == (150_000, 250_000)
+        assert c.guards.one_ticket_per_session and c.guards.max_read_kb == 200
+
+
+def test_old_personal_file_without_guards_still_loads(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('[models]\nreview = "sonnet"\n[unknown]\nx = 1\n')
+    c = Config.load(p, team=TEAM)
+    assert c.models.review == "sonnet" and c.guards.max_read_kb == 200

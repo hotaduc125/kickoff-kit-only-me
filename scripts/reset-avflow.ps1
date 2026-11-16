@@ -69,17 +69,18 @@ if (Test-Path $sf) {
       foreach ($ev in @($d.hooks.PSObject.Properties.Name)) {
         $kept = @()
         foreach ($e in $d.hooks.$ev) {
-          $hs = @($e.hooks | Where-Object { "$($_.command)" -notmatch '(avflow|kickoff)-git-guard|avflow-monitor' })
+          $hs = @($e.hooks | Where-Object { "$($_.command)" -notmatch '(avflow|kickoff)-git-guard|avflow-monitor|avflow-session-guard' })
           if ($hs.Count -gt 0) { $e.hooks = $hs; $kept += $e }
         }
         if ($kept.Count -gt 0) { $d.hooks.$ev = $kept } else { $d.hooks.PSObject.Properties.Remove($ev) }
       }
       if (@($d.hooks.PSObject.Properties).Count -eq 0) { $d.PSObject.Properties.Remove('hooks') }
     }
+    $denyRules = @('Bash(security find-generic-password:*)', 'Bash(security find-internet-password:*)', 'Bash(security dump-keychain:*)', 'Bash(security export:*)', 'Bash(cmdkey:*)', 'Bash(vaultcmd:*)', 'Bash(secret-tool lookup:*)', 'Bash(secret-tool search:*)', 'Bash(keyring get:*)', 'Bash(python -m keyring:*)', 'Bash(python3 -m keyring:*)', 'Bash(git credential fill:*)', 'Bash(gh auth token:*)', 'Bash(glab config get token:*)')
     if ($d.permissions) {
       foreach ($k in "allow", "ask", "deny") {
         if ($d.permissions.$k) {
-          $d.permissions.$k = @($d.permissions.$k | Where-Object { $_ -notmatch '^mcp__(avflow-tickets|kickoff-tickets|htkm-tickets|redmine-agent)__' })
+          $d.permissions.$k = @($d.permissions.$k | Where-Object { $_ -notmatch '^mcp__(avflow-tickets|kickoff-tickets|htkm-tickets|redmine-agent)__' -and $denyRules -notcontains $_ })
         }
       }
       $d | ConvertTo-Json -Depth 20 | Set-Content -Encoding UTF8 $sf
