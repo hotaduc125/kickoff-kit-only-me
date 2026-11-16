@@ -1,4 +1,4 @@
-# avflow — Windows test checklist (3.0)
+# avflow — Windows test checklist (3.0.x)
 
 Run on a Windows 10/11 PC that has never had avflow, ideally a team member's machine, with the PM watching
 (screen share). Write the result of every step: ✅, ❌ (copy the exact message), or ➖ (skipped).
@@ -24,20 +24,20 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 
 | # | Check | Command / action | Expected |
 |---|---|---|---|
-| 1.1 | Get the files | `gh release download v3.0.0 --repo alvin-enc/avflow-marketplace` | the wheel, `bootstrap.ps1`, `bootstrap.sh` and `INSTALL.md` in one folder |
-| 1.2 | Run bootstrap | `powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 .\avflow-3.0.0-py3-none-any.whl` | uv installed if missing, then `avflow 3.0.0 — setup` |
+| 1.1 | Get the files | `gh release download v3.0.1 --repo alvin-enc/avflow-marketplace` | the wheel, `bootstrap.ps1`, `bootstrap.sh` and `INSTALL.md` in one folder |
+| 1.2 | Run bootstrap | `powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 .\avflow-3.0.1-py3-none-any.whl` | uv installed if missing, then `avflow 3.0.1 — setup` |
 | 1.3 | Team settings | — | setup prints the **Team settings** (Redmine URL, GitLab host, statuses, workflow, models, monitor) and does **not** ask for the URL, the workflow, the models or the guardrails |
 | 1.4 | Redmine API key | paste your **own** key (input hidden) | `✅ Connected as <your name>` |
 | 1.5 | Token storage | Control Panel → Credential Manager → Windows Credentials | an entry containing `avflow` |
 | 1.6 | GitLab | — | `✅ GitLab login (gitlab.enclave.vn)`, or a hint how to sign in with `glab auth login` (then run `avflow setup` again) |
 | 1.7 | Claude Code steps | — | ✅ MCP registered, permissions, Superpowers, avflow plugin, handoff, three role subagents, git guardrails hook, context monitor hook |
-| 1.8 | Final check | printed at the end | all ✅ (➖ lines are fine), including `Workflow:`, `Git guardrails hook`, `Context monitor`, the three subagents with models opus / sonnet / opus and `Plugin integrity: v3.0.0` |
+| 1.8 | Final check | printed at the end | all ✅ (➖ lines are fine), including `Workflow:`, `Git guardrails hook`, `Context monitor`, the three subagents with models opus / sonnet / opus and `Plugin integrity: v3.0.1` |
 
 ## 2. After install
 
 | # | Check | Command | Expected |
 |---|---|---|---|
-| 2.1 | Commands on PATH (new window) | `avflow --version` | `3.0.0` |
+| 2.1 | Commands on PATH (new window) | `avflow --version` | `3.0.1` |
 | 2.2 | Check again | `avflow check` | all ✅, symbols display correctly (no `?` or crash) |
 | 2.3 | Configuration | `avflow config` | `[tickets]`, `[repo]`, `[workflow]`, `[models]`, `[monitor]`; *"Token stored in the OS keyring … : yes"*; **no** token value |
 | 2.4 | MCP list | `claude mcp list` | `avflow-tickets` connected |
@@ -94,7 +94,7 @@ The functional tests (tickets, risk areas, CI) are in `docs/test-plan.md` and ar
 
 | # | Check | Action | Expected |
 |---|---|---|---|
-| 6.1 | Edit a skill | add a line to `…\.claude\plugins\cache\avflow\avflow\3.0.0\skills\tickets\SKILL.md` | `avflow check` → ❌ modified: skills/tickets/SKILL.md |
+| 6.1 | Edit a skill | add a line to `…\.claude\plugins\cache\avflow\avflow\3.0.1\skills\tickets\SKILL.md` | `avflow check` → ❌ modified: skills/tickets/SKILL.md |
 | 6.2 | Restore | `/plugin uninstall avflow@avflow`, then `/plugin install avflow@avflow` | check → ✅ |
 | 6.3 | Edit a subagent | add a line to `$env:USERPROFILE\.claude\agents\avflow-reviewer.md` | `avflow check` → ❌ *edited by hand — run avflow setup*; after `avflow setup` → ✅ |
 
@@ -127,7 +127,7 @@ In a clone of `avflow-sandbox` on a new feature branch (`git switch -c windows-t
 
 | # | Check | Command | Expected |
 |---|---|---|---|
-| 9.1 | Update | `avflow update` | installs 3.0.0, plugin updated |
+| 9.1 | Update | `avflow update` | installs 3.0.1, plugin updated |
 | 9.2 | Check | `avflow check` | the three subagents ❌ *edited by hand — run avflow setup* (3.0 changed them) |
 | 9.3 | Setup once | `avflow setup` | asks nothing new; `check` all ✅ |
 | 9.4 | New session | `/avflow:next-ticket` | no Mode question; `choose-mode` no longer listed |
