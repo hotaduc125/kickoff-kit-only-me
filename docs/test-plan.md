@@ -514,7 +514,7 @@ Từ 3.0 không còn chế độ (DIRECT / PLAN / FULL / SPIKE) và không còn 
 ### D10. MR thiếu `Refs #id`
 
 - **Các bước:** mở một MR có tiêu đề không chứa `Refs #`.
-- **Kết quả mong đợi:** job **avflow-mr-title** đỏ với *"MR title must contain 'Refs #<ticket-id>'"*.
+- **Kết quả mong đợi:** job **avflow-mr-title** đỏ với *"MR title must contain Refs #<ticket-id>"*.
 
 ### D10b. Chỉ tin private note `[avflow]` (chỉ 0.1b)
 

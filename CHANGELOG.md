@@ -32,6 +32,11 @@ after the update applies the new team settings on its own.
 
 ### Fixed
 
+- **`avflow-mr-title` failed on every merge request:** the script line was not quoted, so YAML read ` #` in
+  `'refs #[0-9]+'` as a comment and the shell got an unterminated quote. The line is now quoted. Projects set up with
+  an earlier version: in `.gitlab-ci.avflow.yml`, replace the `avflow-mr-title` script line with
+  `- 'echo "$CI_MERGE_REQUEST_TITLE" | grep -Eiq "refs #[0-9]+" || (echo "MR title must contain Refs #<ticket-id>"; exit 1)'`
+  (do not use `avflow init --force` for this: it also overwrites the project's `CLAUDE.md`).
 - **No pipeline in a new project:** every avflow CI job is in the `.pre` / `.post` stages, and GitLab creates no
   pipeline whose jobs are all there — so in a project that had no build or test jobs yet, merge requests got no
   pipeline (and *Ready for test* never ran after a merge). `avflow init` now writes `.gitlab-ci.yml` with a placeholder
