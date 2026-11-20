@@ -196,6 +196,26 @@ def test_ci_template_has_secret_scan_on_mr_and_develop():
     assert {"avflow-mr-title", "avflow-ready-for-test"} <= set(d)
 
 
+def test_ci_mr_title_script_survives_yaml_and_runs(tmp_path):
+    # An unquoted ` #` in a YAML script line starts a comment: the shell then got `grep -Eiq 'refs` and failed on
+    # every merge request. Parse the template the way GitLab does and run the script in a real shell.
+    import os
+    import subprocess
+    import yaml
+    from importlib import resources
+    d = yaml.safe_load(resources.files("avflow").joinpath("templates/.gitlab-ci.avflow.yml").read_text())
+    script = "\n".join(d["avflow-mr-title"]["script"])
+    assert "#[0-9]+" in script
+
+    def run(title):
+        env = {**os.environ, "CI_MERGE_REQUEST_TITLE": title}
+        return subprocess.run(["sh", "-c", script], env=env, capture_output=True, text=True)
+
+    assert run("Fix login timeout Refs #123").returncode == 0
+    bad = run("Fix login timeout")
+    assert bad.returncode == 1 and "Refs #<ticket-id>" in bad.stdout
+
+
 def test_reviewer_blocks_weakened_tests():
     from importlib import resources
     t = resources.files("avflow").joinpath("agents/avflow-reviewer.md").read_text()
