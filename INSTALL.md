@@ -34,7 +34,7 @@ avflow update
 
 It downloads the latest release, installs it, updates the Claude Code plugin and runs `avflow check`. The first check after an update applies the new team settings (permissions, role subagents, hooks) without questions and without touching your token; then **start a new Claude Code session**. `avflow update --check` only tells you whether an update is available; `avflow setup --apply` applies the team settings again by hand.
 
-**Updating from 3.0.x to 3.0.2:** `avflow update`, then a new Claude Code session — nothing else.
+**Updating from 3.0.x to 3.0.2 or later:** `avflow update`, then a new Claude Code session — nothing else.
 
 **Updating from 2.x to 3.0:** run `avflow setup` once after `avflow update` (3.0 changes the role subagents, so `avflow check`
 reports them until then), and start a new Claude Code session. There are no modes any more; see the user guide.

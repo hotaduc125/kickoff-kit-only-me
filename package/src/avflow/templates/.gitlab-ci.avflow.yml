@@ -19,7 +19,7 @@ avflow-mr-title:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
-    - echo "$CI_MERGE_REQUEST_TITLE" | grep -Eiq 'refs #[0-9]+' || (echo "MR title must contain 'Refs #<ticket-id>'"; exit 1)
+    - 'echo "$CI_MERGE_REQUEST_TITLE" | grep -Eiq "refs #[0-9]+" || (echo "MR title must contain Refs #<ticket-id>"; exit 1)'
 
 avflow-secret-scan:
   stage: .pre
