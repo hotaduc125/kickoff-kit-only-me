@@ -1,6 +1,6 @@
 # avflow user guide (macOS & Windows)
 
-For avflow **3.0.2**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
+For avflow **3.0.3**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
 the same change as any behaviour it describes.
 
 ## What avflow is
@@ -20,6 +20,10 @@ After installing, your machine has:
 **Your Redmine token** is stored in the operating system's secure store (Keychain on macOS, Credential Manager on Windows). It is never written to a file and never passes through the AI conversation.
 
 **Where it works:** Claude Code in a terminal, and the Code tab of Claude Desktop. Installing and updating always happen in a terminal.
+
+### What is new in 3.0.3
+
+- **Hotfix: the `avflow-mr-title` CI job failed on every merge request.** Projects set up with an earlier version: in `.gitlab-ci.avflow.yml`, replace the `avflow-mr-title` script line with the quoted line in `CHANGELOG.md` (3.0.3). `avflow update` does not change files in project repositories.
 
 ### What is new in 3.0.2
 
@@ -51,7 +55,7 @@ No `uv`? No problem: the install script installs it.
 
 Download the release files into one folder, run the install script, enter your token; about 10 minutes.
 
-**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.2`):
+**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.3`):
 
 ```bash
 gh release download v<version> --repo alvin-enc/avflow-marketplace
