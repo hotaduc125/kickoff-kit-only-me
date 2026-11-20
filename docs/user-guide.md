@@ -363,7 +363,9 @@ project owns this file: edit it, add its own areas (payments, machine control, �
 It also adds the team's standard files: `CLAUDE.md`, `docs/CONTEXT.md`, a first ADR, `CODEOWNERS`, the merge request template, `.gitattributes`, `.editorconfig`, and the GitLab CI jobs that scan the commits for secrets (gitleaks, the server-side backup of the guardrails), check `Refs #id` in merge request titles, move merged tickets to *Ready for test*, and check the risk areas' required checks (`avflow-risk-check`, with its
 scripts `ci/avflow_risk_check.py` and `ci/avflow_risk.py`). Existing files are never overwritten (use `--force` to replace them); if the project already has a `.gitlab-ci.yml`, avflow tells you to add `include: - local: .gitlab-ci.avflow.yml` to it.
 
-Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands; test environments, languages and project skills), protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
+**Keep at least one job of your own in `.gitlab-ci.yml`.** The avflow jobs all run in the `.pre` / `.post` stages, and GitLab creates **no pipeline** whose jobs are all there — the merge request would show no pipeline at all. A new `.gitlab-ci.yml` therefore starts with a placeholder job, `build-and-test`; replace it with the project's build and test jobs, keeping its rules (merge requests, and pushes to `develop`). `avflow init` and `avflow risk check` warn when the file has no such job.
+
+Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands; test environments, languages and project skills), protect `main` and `develop` in GitLab (no direct push) and turn on *Pipelines must succeed* (Settings → Merge requests; `avflow init` cannot set it), check that the first merge request gets a pipeline, and set the CI/CD variables:
 
 | Variable | Value |
 | --- | --- |

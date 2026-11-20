@@ -5,6 +5,28 @@ Newest decisions first. Add an entry whenever a session decides something (date 
 
 ---
 
+## A placeholder CI job so new projects get pipelines (Nov 20, 2026)
+
+**Found:** a project set up with `avflow init` and no build jobs of its own got **no pipeline** on its merge request,
+so "wait for a green pipeline" had nothing to wait for. GitLab creates no pipeline whose jobs are all in the `.pre` /
+`.post` stages — and every avflow job is in one of them. The sandbox never showed it: it has its own `lint` and `test`.
+The same gap stopped `avflow-ready-for-test` after a merge into `develop`.
+
+**Decided:**
+- The avflow jobs **stay in `.pre` / `.post`**: moving them to `test` would break projects whose `stages:` has no
+  `test` stage.
+- A `.gitlab-ci.yml` written by `avflow init` starts with a **placeholder job** `build-and-test` (stage `test`, rules:
+  merge requests and pushes to `develop` — no branch pipelines beside the MR ones). It **passes** (an `echo` with a
+  TODO): a failing placeholder would block the very merge request that adds the avflow files.
+- `avflow init` and `avflow risk check` **warn** when an existing `.gitlab-ci.yml` has no job outside `.pre` / `.post`
+  (a line-based reading, standard library only; no warning when other included files may bring jobs).
+- *Pipelines must succeed* stays a manual GitLab setting; `avflow init`'s *Next* steps now name it.
+
+**Consequence:** a passing placeholder can look like a green build — the *Next* steps, the file comment and the user
+guide say to replace it. Projects set up with 3.0.0–3.0.1 and no jobs of their own need one added by hand (CHANGELOG).
+
+---
+
 ## 3.0.2: usage limits, update without setup, security re-check (Nov 16, 2026)
 
 **Why:** running out of Claude usage mid-week is one of the PM's biggest worries — one occurrence stops the whole team

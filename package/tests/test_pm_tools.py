@@ -208,6 +208,53 @@ def test_init_hint_ignores_commented_include(tmp_path):
     assert any("include" in s for s in r["skipped"])
 
 
+def _regular_jobs(text):
+    import yaml
+    reserved = {"include", "stages", "variables", "default", "workflow", "image", "services", "cache",
+                "before_script", "after_script"}
+    d = yaml.safe_load(text) or {}
+    return {k: v for k, v in d.items() if k not in reserved and not k.startswith(".")
+            and isinstance(v, dict) and v.get("stage", "test") not in (".pre", ".post")}
+
+
+def test_init_ci_has_a_regular_job_so_gitlab_creates_pipelines(tmp_path):
+    # GitLab creates no pipeline whose jobs are all in .pre / .post — and every avflow job is.
+    init_repo(tmp_path)
+    jobs = _regular_jobs((tmp_path / ".gitlab-ci.yml").read_text())
+    assert len(jobs) == 1
+    rules = [r["if"] for r in next(iter(jobs.values()))["rules"]]
+    assert any("merge_request_event" in r for r in rules)
+    assert any("develop" in r and "push" in r for r in rules)       # avflow-ready-for-test needs the develop pipeline
+
+
+def test_avflow_jobs_alone_would_create_no_pipeline():
+    from importlib import resources
+    text = resources.files("avflow").joinpath("templates/.gitlab-ci.avflow.yml").read_text()
+    assert _regular_jobs(text) == {}          # why .gitlab-ci.yml must bring its own job
+
+
+def test_ci_regular_job_detection():
+    from avflow.init_repo import ci_has_regular_job
+    inc = "include:\n  - local: .gitlab-ci.avflow.yml\n"
+    assert ci_has_regular_job(inc + "\n# Add jobs below.\n") is False
+    assert ci_has_regular_job(inc + "stages: [build]\nvariables:\n  A: b\n.hidden:\n  script: [x]\n") is False
+    assert ci_has_regular_job(inc + "lint:\n  stage: .pre\n  script: [x]\n") is False
+    assert ci_has_regular_job(inc + "test:\n  script: [pytest]\n") is True           # no stage → test
+    assert ci_has_regular_job(inc + "build:\n  stage: build\n  script: [make]\n") is True
+    assert ci_has_regular_job("include: '.gitlab-ci.avflow.yml'\n") is False
+    # jobs may come from other included files: unknown, no warning
+    assert ci_has_regular_job(inc + "  - project: group/ci\n    file: build.yml\n") is None
+    assert ci_has_regular_job("include:\n  - template: Jobs/Build.gitlab-ci.yml\n") is None
+
+
+def test_init_warns_when_existing_ci_has_only_avflow_jobs(tmp_path):
+    (tmp_path / ".gitlab-ci.yml").write_text("include:\n  - local: .gitlab-ci.avflow.yml\n")
+    r = init_repo(tmp_path)
+    assert any("no pipeline" in w for w in r["warnings"])
+    (tmp_path / ".gitlab-ci.yml").write_text("include:\n  - local: .gitlab-ci.avflow.yml\ntest:\n  script: [pytest]\n")
+    assert init_repo(tmp_path)["warnings"] == []
+
+
 def test_init_no_hint_when_include_present(tmp_path):
     (tmp_path / ".gitlab-ci.yml").write_text("include:\n  - local: .gitlab-ci.avflow.yml\nstages: [test]\n")
     r = init_repo(tmp_path)
