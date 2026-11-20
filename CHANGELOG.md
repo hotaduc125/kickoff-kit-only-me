@@ -30,6 +30,15 @@ after the update applies the new team settings on its own.
   `avflow check` reminds you that `/usage` in Claude Code shows the plan's 5-hour and weekly limits.
 - **User guide: "When you hit a limit"** — what to do for the Opus, 5-hour and weekly limits.
 
+### Fixed
+
+- **No pipeline in a new project:** every avflow CI job is in the `.pre` / `.post` stages, and GitLab creates no
+  pipeline whose jobs are all there — so in a project that had no build or test jobs yet, merge requests got no
+  pipeline (and *Ready for test* never ran after a merge). `avflow init` now writes `.gitlab-ci.yml` with a placeholder
+  job `build-and-test` (stage `test`, on merge requests and pushes to `develop`) to replace with the project's own
+  jobs. `avflow init` and `avflow risk check` warn when an existing `.gitlab-ci.yml` has no job outside `.pre` / `.post`.
+  Projects set up with 3.0.0–3.0.1 and no build jobs of their own: add one job in a normal stage.
+
 ### Security
 
 - **Stored tokens cannot be read by the agent:** setup now denies commands that read the OS keyring or CLI tokens

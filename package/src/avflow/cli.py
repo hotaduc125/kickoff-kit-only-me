@@ -581,13 +581,17 @@ def cmd_init(args) -> int:
         ok(f"overwritten {f}")
     for f in r["skipped"]:
         print(f"  ➖ kept existing {f}")
+    for w in r.get("warnings", []):
+        print(f"  ⚠️  {w}")
     print("\nNext:\n"
           "  1. .avflow/project.toml: review the risk areas, add the project's own (payments, authentication, …) and\n"
           "     owners; then `avflow risk check` and `avflow risk sync` (CODEOWNERS).\n"
-          "  2. Fill the TODOs in CLAUDE.md; add terms to docs/CONTEXT.md.\n"
+          "  2. Fill the TODOs in CLAUDE.md; add terms to docs/CONTEXT.md. Replace the placeholder job build-and-test in\n"
+          "     .gitlab-ci.yml with the project's build and test jobs (GitLab needs one job outside .pre / .post).\n"
           "  3. GitLab CI/CD variables: REDMINE_URL, REDMINE_CI_API_KEY (protected), REDMINE_READ_API_KEY (read-only account,\n"
           "     not protected) and AVFLOW_GITLAB_TOKEN (project access token, Reporter, read_api) for avflow-risk-check.\n"
-          "  4. Commit everything in a merge request.")
+          "  4. GitLab: protect develop and main (no direct push) and turn on *Pipelines must succeed*.\n"
+          "  5. Commit everything in a merge request; check that its pipeline runs.")
     return 0
 
 
@@ -644,6 +648,10 @@ def _risk_generated_warnings(root, p) -> None:
     ci = root / risk.CI_COPY
     if ci.exists() and not risk.ci_copy_current(ci.read_text(encoding="utf-8")):
         print(f"  ⚠️  {risk.CI_COPY} is out of date with this avflow — run `avflow risk sync`.")
+    from .init_repo import CI_NO_PIPELINE, ci_has_regular_job
+    gl = root / ".gitlab-ci.yml"
+    if gl.exists() and ci_has_regular_job(gl.read_text(encoding="utf-8")) is False:
+        print(f"  ⚠️  {CI_NO_PIPELINE}.")
     for area, paths in risk.preset_drift(p).items():
         print(f"  ⚠️  A newer stack preset adds paths to '{area}': {', '.join(paths)} — add them by merge request if they apply.")
 

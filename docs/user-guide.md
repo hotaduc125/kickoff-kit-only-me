@@ -1,6 +1,6 @@
 # avflow user guide (macOS & Windows)
 
-For avflow **3.0.1**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
+For avflow **3.0.2**. Source of truth for the user guide from now on (it was first written as a Claude Doc); update it in
 the same change as any behaviour it describes.
 
 ## What avflow is
@@ -20,6 +20,15 @@ After installing, your machine has:
 **Your Redmine token** is stored in the operating system's secure store (Keychain on macOS, Credential Manager on Windows). It is never written to a file and never passes through the AI conversation.
 
 **Where it works:** Claude Code in a terminal, and the Code tab of Claude Desktop. Installing and updating always happen in a terminal.
+
+### What is new in 3.0.2
+
+- **Updating needs no setup.** After `avflow update`, the first `avflow check` applies the new team settings by itself (permissions, role subagents, hooks) — no questions, your token untouched. Then open a new Claude Code session.
+- **Cheaper by default.** The planner subagent now uses Sonnet (the reviewer keeps Opus); the context warning is at 150k tokens and the limit at 250k.
+- **One ticket per session.** Type `/clear` (or open a new session) before the next ticket; avflow refuses a second ticket in the same session.
+- **No large files read whole.** The agent searches a file over 200 KB and reads only the part it needs.
+- **Stronger guardrails.** Blocked commands stay blocked inside `bash -c`, `python -c`, PowerShell, `eval`, aliases and similar; the agent cannot read your stored token.
+- **Usage.** `avflow usage` shows daily totals; `/usage` in Claude Code shows your plan's limits; see *When you hit a limit*.
 
 ## Before you install
 
@@ -42,7 +51,7 @@ No `uv`? No problem: the install script installs it.
 
 Download the release files into one folder, run the install script, enter your token; about 10 minutes.
 
-**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.1`):
+**1. Download the release files** (replace `<version>` with the version the PM announces, for example `3.0.2`):
 
 ```bash
 gh release download v<version> --repo alvin-enc/avflow-marketplace
@@ -363,7 +372,9 @@ project owns this file: edit it, add its own areas (payments, machine control, �
 It also adds the team's standard files: `CLAUDE.md`, `docs/CONTEXT.md`, a first ADR, `CODEOWNERS`, the merge request template, `.gitattributes`, `.editorconfig`, and the GitLab CI jobs that scan the commits for secrets (gitleaks, the server-side backup of the guardrails), check `Refs #id` in merge request titles, move merged tickets to *Ready for test*, and check the risk areas' required checks (`avflow-risk-check`, with its
 scripts `ci/avflow_risk_check.py` and `ci/avflow_risk.py`). Existing files are never overwritten (use `--force` to replace them); if the project already has a `.gitlab-ci.yml`, avflow tells you to add `include: - local: .gitlab-ci.avflow.yml` to it.
 
-Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands; test environments, languages and project skills), protect `main` and `develop` in GitLab (no direct push, *Pipelines must succeed*), and set the CI/CD variables:
+**Keep at least one job of your own in `.gitlab-ci.yml`.** The avflow jobs all run in the `.pre` / `.post` stages, and GitLab creates **no pipeline** whose jobs are all there — the merge request would show no pipeline at all. A new `.gitlab-ci.yml` therefore starts with a placeholder job, `build-and-test`; replace it with the project's build and test jobs, keeping its rules (merge requests, and pushes to `develop`). `avflow init` and `avflow risk check` warn when the file has no such job.
+
+Then review `.avflow/project.toml` (areas, owners), run `avflow risk check` and `avflow risk sync`, fill in the TODOs in `CLAUDE.md` (build and test commands; test environments, languages and project skills), protect `main` and `develop` in GitLab (no direct push) and turn on *Pipelines must succeed* (Settings → Merge requests; `avflow init` cannot set it), check that the first merge request gets a pipeline, and set the CI/CD variables:
 
 | Variable | Value |
 | --- | --- |
@@ -398,7 +409,7 @@ After the pilot, these numbers decide whether `gate = "fail"` becomes the defaul
 
 ### Moving a project from 2.x to 3.0
 
-1. Members: `avflow update`, then `avflow setup` once (new subagents), and a new Claude Code session.
+1. Members: `avflow update` and a new Claude Code session (from 3.0.2 on, the first `avflow check` regenerates the subagents; with 3.0.0 or 3.0.1, run `avflow setup` once).
 2. In each project, on a feature branch: `avflow init` (adds `.avflow/project.toml`, the `avflow-risk-check` job and its
    scripts; existing files are kept). Add the project's own areas, owners and checks; move the sensitive paths that
    2.x listed in `CLAUDE.md` / `CODEOWNERS` into areas; fill in the *Test environments and languages* section of

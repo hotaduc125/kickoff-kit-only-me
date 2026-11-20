@@ -61,3 +61,13 @@ def test_files_nothing_risky(tmp_path, capsys):
     write(tmp_path)
     assert cli.main(["risk", "files", "src/ui.cs", "--path", str(tmp_path)]) == 0
     assert "standard flow" in capsys.readouterr().out
+
+
+def test_check_warns_when_ci_would_create_no_pipeline(tmp_path, capsys):
+    write(tmp_path)
+    (tmp_path / ".gitlab-ci.yml").write_text("include:\n  - local: .gitlab-ci.avflow.yml\n")
+    cli.main(["risk", "check", "--path", str(tmp_path)])
+    assert "GitLab creates no pipeline" in capsys.readouterr().out
+    (tmp_path / ".gitlab-ci.yml").write_text("include:\n  - local: .gitlab-ci.avflow.yml\ntest:\n  script: [pytest]\n")
+    cli.main(["risk", "check", "--path", str(tmp_path)])
+    assert "GitLab creates no pipeline" not in capsys.readouterr().out
