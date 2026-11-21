@@ -690,6 +690,11 @@ Rủi ro được xác định **ba lần** — từ vùng rủi ro trên ticket
 - **Các bước:** trong repo `avflow-sandbox`: `avflow report --project avflow-test --days 7 --out report.md`.
 - **Kết quả mong đợi:** bảng tiến độ theo Release 1 / Release 2; mục *over estimate* có ticket vượt; mục *Reopened* có ticket bị chuyển ngược; mục **Risk (N tickets reviewed in the period)**: *High-risk changes: x of N*, bảng theo vùng (T3: *Machine control* — *From the ticket*; T8: *Found at plan*; một vùng chỉ lộ ở review, ví dụ *Build and CI* ở E5/E12, nằm ở *Found only at review*), mục *Profile gaps* có `src/sandbox/orders.py` của E6 kèm gợi ý `avflow risk suggest`; ghi chú `[avflow] required …` **công khai** (G6) **không** được tính; mục *Merge requests* có số MR đã merge, thời gian trung vị và *First pipeline green x/y*.
 
+### G1b. Báo cáo với project sai
+
+- **Các bước:** `avflow report --project "Tên hiển thị"` (dùng tên hiển thị thay cho identifier); `avflow risk suggest --project khong-co`.
+- **Kết quả mong đợi:** không có traceback Python; thông báo *Project '…' not found in the ticket system* kèm hướng dẫn dùng identifier (tên ngắn trong URL) và danh sách các project tài khoản nhìn thấy; mã thoát 1.
+
 ### G2. Thống kê sử dụng
 
 - **Các bước:** sau các phần C–E: `avflow usage`.

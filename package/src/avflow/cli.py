@@ -693,17 +693,20 @@ def cmd_risk_suggest(args) -> int:
         return 1
     since = datetime.now(timezone.utc) - timedelta(days=args.days)
     entries = []
-    for i in adapter.list_issues(project_id=project, status_id="*"):
-        try:
-            if datetime.fromisoformat(str(i.get("updated_on", "")).replace("Z", "+00:00")) < since:
+    try:
+        for i in adapter.list_issues(project_id=project, status_id="*"):
+            try:
+                if datetime.fromisoformat(str(i.get("updated_on", "")).replace("Z", "+00:00")) < since:
+                    continue
+            except ValueError:
                 continue
-        except ValueError:
-            continue
-        private = [j.get("notes") or "" for j in adapter.issue_raw(i["id"], include="journals").get("journals", [])
-                   if j.get("private_notes")]
-        req = risk.required_from_notes(private)
-        if req["gaps"]:
-            entries.append({"ticket": i["id"], "areas": req["areas"], "gaps": req["gaps"]})
+            private = [j.get("notes") or "" for j in adapter.issue_raw(i["id"], include="journals").get("journals", [])
+                       if j.get("private_notes")]
+            req = risk.required_from_notes(private)
+            if req["gaps"]:
+                entries.append({"ticket": i["id"], "areas": req["areas"], "gaps": req["gaps"]})
+    except AdapterError as e:
+        return _ticket_error(adapter, project, e)
     sugg = risk.suggest_paths(entries, profile)
     if not sugg:
         ok(f"No profile gaps in the tickets updated in the last {args.days} days.")
@@ -751,22 +754,47 @@ def _ticket_adapter():
     return cfg, make_adapter(t, get_secret(t.provider, t.url))
 
 
+def _ticket_error(adapter, project: str | None, err: Exception) -> int:
+    """A ticket-system error as a message (never a traceback). An unknown project lists the visible ones."""
+    known = None
+    if project:
+        try:
+            known = adapter.projects()
+        except Exception:  # noqa: BLE001 — only a hint; the original error is what matters
+            known = None
+    if known is not None and str(project) not in {p.get("identifier") for p in known} | {str(p.get("id")) for p in known}:
+        bad(f"Project '{project}' not found in the ticket system. Use the project's identifier "
+            "(the short name in its URL, e.g. …/projects/<identifier>), not its display name.")
+        if known:
+            print("  Projects your account can see: " + ", ".join(sorted(p["identifier"] for p in known if p.get("identifier"))))
+        return 1
+    bad(str(err))
+    return 1
+
+
 def cmd_release_notes(args) -> int:
     from . import release_notes as rn
     cfg, adapter = _ticket_adapter()
     commits = rn.commits_in_range(args.from_ref, args.to_ref, args.repo)
-    text = rn.build(commits, rn.collect(adapter, commits), cfg.tickets.blocker_done, args.from_ref, args.to_ref)
+    try:
+        text = rn.build(commits, rn.collect(adapter, commits), cfg.tickets.blocker_done, args.from_ref, args.to_ref)
+    except AdapterError as e:
+        return _ticket_error(adapter, None, e)
     return _emit(text, args.out)
 
 
 def cmd_report(args) -> int:
-    from .report import build_report
+    from . import report
     cfg, adapter = _ticket_adapter()
     project = args.project or cfg.tickets.project
     if not project:
         bad("Give the project identifier: avflow report --project <identifier> (or set `project` under [tickets] with avflow config --edit).")
         return 1
-    return _emit(build_report(adapter, cfg.tickets, project, args.days), args.out)
+    try:
+        text = report.build_report(adapter, cfg.tickets, project, args.days)
+    except AdapterError as e:
+        return _ticket_error(adapter, project, e)
+    return _emit(text, args.out)
 
 
 def cmd_usage(args) -> int:

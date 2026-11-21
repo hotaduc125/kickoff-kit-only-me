@@ -85,7 +85,7 @@ syncs the plugin to the marketplace repo, tags, and creates a GitHub Release wit
 
 ## Current state (Nov 2026)
 
-- Version **3.0.3** in the repository (3.0.0 released Nov 13, 2026; 3.0.1 adds the gh / glab guardrails; 3.0.3, Nov 20, is
+- Version **3.0.4** in the repository (3.0.4, Nov 21, is a hotfix: `avflow report` / `risk suggest` / `release-notes` print a message instead of a traceback on ticket-system errors, listing the visible projects for an unknown `--project`; 3.0.0 released Nov 13, 2026; 3.0.1 adds the gh / glab guardrails; 3.0.3, Nov 20, is
   a hotfix quoting the `avflow-mr-title` CI script line; 3.0.2, released Nov 20 — usage limits and security re-check: `avflow check` applies the team settings once per installed
   version (`apply_if_new`), Sonnet planner, 150k / 250k thresholds, session guards, credential deny rules, nested-command
   guard). Releases to the marketplace may lag; check `git tag` and GitHub Releases.

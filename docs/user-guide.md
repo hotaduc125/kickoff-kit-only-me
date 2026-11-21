@@ -404,7 +404,9 @@ Two read-only commands turn tickets and merge requests into the documents a PM n
 | `avflow release-notes --from <previous-tag> [--to <commit>] [--out notes.md]` | Release notes from the tickets referenced by the commits, high-risk tickets first and marked with their risk areas (for example **[Machine control]**), an acceptance checklist skeleton, and warnings for commits without a ticket or tickets not yet *Ready for test* |
 | `avflow report --project <identifier> [--days 7] [--out report.md]` | Weekly report: progress per release, tickets over estimate by more than 50%, tickets reopened in the period, the **risk** of the changes reviewed in the period (share of high-risk changes, tickets per risk area and where the area was found — ticket, plan or only at review — and profile gaps), and — when run inside the repository with `glab` signed in — merged merge requests, median time to merge and first-pipeline success |
 
-Set a default project once with `avflow config --edit` (`project` under `[tickets]`).
+`<identifier>` is the project's identifier in the ticket system — the short name in its URL (`…/projects/<identifier>`),
+not its display name; its number also works. An unknown project gives a message listing the projects your account can
+see. Set a default project once with `avflow config --edit` (`project` under `[tickets]`).
 
 The risk section reads the private notes avflow writes at start, plan and review, so it covers the tickets that reached
 `review_requirements` in the period. Areas found **only at review** mean the ticket and the plan missed a risk: improve

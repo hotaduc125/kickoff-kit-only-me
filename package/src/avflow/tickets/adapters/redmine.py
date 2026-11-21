@@ -225,30 +225,29 @@ class RedmineAdapter:
 
 
     # ---------- read-only helpers for PM tools (not exposed through MCP)
-    def list_issues(self, max_items: int = 2000, **params) -> list[dict]:
+    def _paged(self, path: str, key: str, max_items: int, params: dict) -> list[dict]:
         out, offset = [], 0
         while len(out) < max_items:
-            page = self._req("GET", "/issues.json", params={**params, "limit": 100, "offset": offset})
-            items = page.get("issues", [])
+            page = self._req("GET", path, params={**params, "limit": 100, "offset": offset})
+            items = page.get(key, [])
             out += items
             if len(items) < 100 or offset + 100 >= page.get("total_count", 0):
                 break
             offset += 100
         return out[:max_items]
+
+    def list_issues(self, max_items: int = 2000, **params) -> list[dict]:
+        return self._paged("/issues.json", "issues", max_items, params)
 
     def issue_raw(self, issue_id: int, include: str = "journals") -> dict:
         return self._issue(issue_id, include=include)
 
     def time_entries(self, max_items: int = 5000, **params) -> list[dict]:
-        out, offset = [], 0
-        while len(out) < max_items:
-            page = self._req("GET", "/time_entries.json", params={**params, "limit": 100, "offset": offset})
-            items = page.get("time_entries", [])
-            out += items
-            if len(items) < 100 or offset + 100 >= page.get("total_count", 0):
-                break
-            offset += 100
-        return out[:max_items]
+        return self._paged("/time_entries.json", "time_entries", max_items, params)
+
+    def projects(self, max_items: int = 1000) -> list[dict]:
+        """Projects visible to this account (id, identifier, name)."""
+        return self._paged("/projects.json", "projects", max_items, {})
 
     def statuses(self) -> list[dict]:
         return self._status_list()
