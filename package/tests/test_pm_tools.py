@@ -319,3 +319,62 @@ def test_init_cli_prints_next_steps(tmp_path, capsys, monkeypatch):
     out = capsys.readouterr().out
     assert "go" in out and "AVFLOW_GITLAB_TOKEN" in out and "avflow risk sync" in out
     assert cli.main(["init", "--path", str(tmp_path / "y"), "--stack", "cobol"]) == 1
+
+
+# ---------- report / risk suggest / release-notes: ticket-system errors give a message, not a traceback
+def _cli_with_fake_redmine(monkeypatch):
+    import httpx
+
+    from avflow import cli
+    from avflow.tickets.adapters.redmine import RedmineAdapter
+    from fake_redmine import FakeRedmine, issue as rm_issue
+    fake = FakeRedmine([rm_issue(1)])
+    client = httpx.Client(base_url="https://redmine.test", transport=httpx.MockTransport(fake.handler))
+    adapter = RedmineAdapter(TicketConfig(url="https://redmine.test"), "t", client=client)
+    cfg = type("C", (), {"tickets": TicketConfig(url="https://redmine.test")})()
+    monkeypatch.setattr(cli, "_ticket_adapter", lambda: (cfg, adapter))
+    return cli
+
+
+def test_report_unknown_project_lists_the_visible_projects(monkeypatch, capsys):
+    cli = _cli_with_fake_redmine(monkeypatch)
+    assert cli.main(["report", "--project", "Shop v2"]) == 1
+    out = capsys.readouterr().out
+    assert "Traceback" not in out and "'Shop v2'" in out and "identifier" in out
+    assert "multiline-ai" in out and "shop" in out
+
+
+def test_report_known_project_by_identifier_or_id(monkeypatch, capsys):
+    cli = _cli_with_fake_redmine(monkeypatch)
+    monkeypatch.setattr(report.st, "run", lambda c, interactive=False: (1, ""))
+    assert cli.main(["report", "--project", "shop"]) == 0
+    assert cli.main(["report", "--project", "2"]) == 0
+    assert "# Weekly report" in capsys.readouterr().out
+
+
+def test_report_other_ticket_system_error_is_a_message(monkeypatch, capsys):
+    from avflow.tickets.adapters import AdapterError
+    cli = _cli_with_fake_redmine(monkeypatch)
+
+    def boom(*a, **k):
+        raise AdapterError("Cannot reach Redmine: timeout")
+    monkeypatch.setattr(report, "build_report", boom)
+    assert cli.main(["report", "--project", "shop"]) == 1
+    assert "Cannot reach Redmine: timeout" in capsys.readouterr().out
+
+
+def test_risk_suggest_unknown_project_is_a_message(monkeypatch, capsys, tmp_path):
+    cli = _cli_with_fake_redmine(monkeypatch)
+    assert cli.main(["risk", "suggest", "--path", str(tmp_path), "--project", "nope"]) == 1
+    out = capsys.readouterr().out
+    assert "'nope'" in out and "multiline-ai" in out
+
+
+def test_gitlab_mrs_encodes_the_timestamp():
+    seen = []
+
+    def runner(cmd, interactive=False):
+        seen.append(cmd[-1])
+        return 0, "[]"
+    report.gitlab_mrs(datetime(2026, 11, 14, 15, 46, tzinfo=timezone.utc), None, runner)
+    assert "+" not in seen[0] and "updated_after=2026-11-14T15%3A46%3A00%2B00%3A00" in seen[0]

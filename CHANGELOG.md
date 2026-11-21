@@ -3,6 +3,18 @@
 What changed in each avflow release, newest first. Why things changed is in `docs/decisions.md`; releases before
 3.0.0 are described there by version.
 
+## 3.0.4 — Nov 21, 2026
+
+Hotfix. Upgrading: `avflow update`.
+
+### Fixed
+
+- **`avflow report`, `avflow risk suggest` and `avflow release-notes` showed a Python traceback** when the ticket
+  system returned an error, most often when `--project` was not a project identifier (for example the display name).
+  They now print a short message; for an unknown project they say to use the identifier (the short name in the
+  project's URL) and list the projects your account can see.
+- `avflow report` now URL-encodes the date in its GitLab merge-request query (the `+` of the time zone was sent as-is).
+
 ## 3.0.3 — Nov 20, 2026
 
 Hotfix. Upgrading: `avflow update`. Projects already set up with avflow must also fix their

@@ -10,6 +10,7 @@ import json
 import statistics
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 from . import risk
 from . import setup_steps as st
@@ -133,7 +134,7 @@ def _dt(s):
 
 # ---------- collection
 def gitlab_mrs(since: datetime, cwd: str | None, runner=st.run) -> tuple[list[dict], dict[int, str]] | None:
-    code, out = runner(["glab", "api", f"projects/:fullpath/merge_requests?state=merged&updated_after={since.isoformat()}&per_page=100"])
+    code, out = runner(["glab", "api", f"projects/:fullpath/merge_requests?state=merged&updated_after={quote(since.isoformat(), safe='')}&per_page=100"])
     if code != 0:
         return None
     try:

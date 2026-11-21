@@ -5,6 +5,7 @@ import httpx
 STATUSES = [{"id": 1, "name": "New"}, {"id": 2, "name": "Ready"}, {"id": 3, "name": "In progress"},
             {"id": 4, "name": "In review"}, {"id": 5, "name": "Ready for test"}, {"id": 6, "name": "Resolved"}, {"id": 7, "name": "Closed", "is_closed": True}]
 TRACKERS = [{"id": 1, "name": "Bug"}, {"id": 2, "name": "Task"}]
+PROJECTS = [{"id": 1, "identifier": "multiline-ai", "name": "Multiline AI"}, {"id": 2, "identifier": "shop", "name": "Shop"}]
 ME = {"id": 10, "login": "quinn", "firstname": "Q", "lastname": "Engineer"}
 
 
@@ -35,10 +36,17 @@ class FakeRedmine:
             return httpx.Response(200, json={"issue_statuses": STATUSES})
         if path == "/trackers.json":
             return httpx.Response(200, json={"trackers": TRACKERS})
+        if path == "/projects.json":
+            return httpx.Response(200, json={"projects": PROJECTS, "total_count": len(PROJECTS)})
+        if path in ("/issues.json", "/time_entries.json") and m == "GET" and "project_id" in req.url.params:
+            if req.url.params["project_id"] not in {p["identifier"] for p in PROJECTS} | {str(p["id"]) for p in PROJECTS}:
+                return httpx.Response(404)
+        if path == "/time_entries.json":
+            return httpx.Response(200, json={"time_entries": [], "total_count": 0})
         if path == "/issues.json" and m == "GET":
             p = req.url.params
             res = list(self.issues.values())
-            if "status_id" in p:
+            if "status_id" in p and p["status_id"] != "*":
                 res = [i for i in res if str(i["status"]["id"]) == p["status_id"]]
             if p.get("assigned_to_id") == "me":
                 res = [i for i in res if i["assigned_to"]["id"] == ME["id"]]
